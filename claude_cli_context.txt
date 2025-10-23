@@ -1,0 +1,76 @@
+Project: LinenFlow™ (laundry-app)
+Path: /Users/tossapornwetsiri/laundry-app
+
+Summary:
+- Next.js (App Router) project using TypeScript, Tailwind CSS, and Shadcn/UI-style components.
+- Project layout uses the new /app directory (Server Components by default).
+- Key folders: /app (pages & layouts), /components (custom React components), /components/ui (shadcn base components), /lib (utils), /hooks (custom hooks), /public (images), /styles (globally imported CSS).
+- package.json scripts: dev -> "next dev", build -> "next build", start -> "next start", lint -> "next lint".
+- Notable dependency versions (from package.json): next@15.2.4, react@^19, typescript@^5, tailwindcss@^4.1.9, lucide-react, sonner, zod, etc.
+
+Important notes / assumptions:
+- The repository already uses the App Router (folder /app). Prefer Server Components unless interactivity required (use 'use client').
+- agent.md in the repo states "Next.js 14" as the target; package.json currently lists next@15.2.4. If migrating between specific Next versions is required, clarify target (14 vs 15). I will assume using the installed version in package.json unless you tell me otherwise.
+- Package manager: there is a pnpm lockfile (pnpm-lock.yaml). Use pnpm when possible: `pnpm install` then `pnpm dev`. Alternatively `npm install` works with existing scripts.
+- No network or secrets will be exposed; this file is a static context to feed to Claude CLI.
+
+How to run this app locally (recommended):
+1) Install dependencies (pnpm preferred):
+```bash
+pnpm install
+# or
+npm install
+```
+2) Start dev server:
+```bash
+pnpm dev
+# or
+npm run dev
+```
+3) Build for production:
+```bash
+pnpm build
+# or
+npm run build
+```
+
+Suggested Claude CLI prompt (copy/paste below into Claude, adapt tasks as needed):
+
+"Context: You are an expert Next.js (App Router) senior frontend engineer working on the LinenFlow web app. The repository structure and key facts are:
+- App router at `/app` using Server Components by default.
+- UI library: Shadcn/UI-style components in `/components/ui`.
+- Custom components in `/components` (e.g., `CustomerCard.tsx`, `activities-table.tsx`, `kpi-card.tsx`, `sidebar.tsx`).
+- TypeScript project; run scripts: `dev`, `build`, `start`, `lint` (see package.json). Current installed Next version is 15.2.4 (package.json). There is a pnpm lockfile.
+
+Tasks I want you to do (pick relevant ones and implement or provide step-by-step PR-level changes):
+1) Audit the project for compatibility with Next.js (App Router best practices). Identify any Server/Client boundary issues and recommend fixes.
+2) Where components use client-side hooks, mark the file with `'use client'` and add proper prop types (TypeScript) and small tests or usage examples.
+3) Provide a migration checklist if we should downgrade or lock to Next.js 14 instead of 15 (list exact package.json changes and code changes needed).
+4) Create or update a top-level `README.md` with run/build instructions and brief architecture notes.
+5) Optionally: produce a small PR patch that introduces a `claude_cli_context.txt` (already in the repo) and a `scripts/dev-readme.md` with commands and sanity checks.
+
+Deliverables:
+- A step-by-step plan and the exact file edits (diffs/patches) to apply.
+- Where applicable, full replacement code blocks for any file you change.
+- Tests or smoke-check steps I can run locally (e.g., commands to run and what to expect).
+
+Constraints:
+- Use the App Router patterns and prefer Server Components by default.
+- Preserve the existing UI library and Tailwind setup.
+- If node or tool versions are required, ask for them before making breaking changes.
+
+Assumptions you can use if not specified: Node 18+, pnpm available, TypeScript 5.
+
+Start by listing the highest-priority issues and a short plan of attack. Then implement small, non-breaking changes in the repo and provide patches that I can apply." 
+
+Optional: shorter prompt for quick tasks (e.g., "Convert one component to a Client Component with TypeScript props and add a placeholder fetch using useEffect").
+
+What I added to the repo:
+- `claude_cli_context.txt` (this file) — a concise copy-pasteable context and sample prompt for Claude CLI.
+
+Next steps I can do for you:
+- Tweak the sample Claude prompt to a specific task (migration, audit, component conversion).
+- Run a quick code audit (search for 'use client', missing types, or obvious App Router anti-patterns).
+- Create the README.md with run instructions.
+
+If you want me to continue now, tell me which task from the Suggested prompt you want executed first (audit, migrate to Next 14/15, convert a specific component, or create README)."
