@@ -1,13 +1,12 @@
 "use client"
 
-import { usePathname } from "next/navigation"
-import Link from "next/link"
-import { useTranslations, useLocale } from "next-intl"
+import { usePathname, useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera } from "lucide-react"
+import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
-import { useState } from "react"
+import { useState, useTransition } from "react"
 
 const groupedNavigation = [
   {
@@ -24,6 +23,7 @@ const groupedNavigation = [
       { key: 'checkin', href: '/checkin', icon: Scan },
       { key: 'addItem', href: '/add-item', icon: Plus },
       { key: 'aiScanner', href: '/ai-scanner', icon: Camera },
+      { key: 'dispatch', href: '/operations/dispatch', icon: Truck },
     ],
   },
   {
@@ -44,15 +44,29 @@ const groupedNavigation = [
 ]
 
 export function Sidebar() {
-  // Top-level hooks (required by React rules)
   const t = useTranslations('nav')
   const pathname = usePathname()
-  const locale = useLocale()
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const pathWithoutLocale = (pathname || '').replace(new RegExp(`^/${locale}`), '') || '/'
+  // Extract current locale directly from pathname - this is the source of truth
+  // pathname is like "/th/customers" or "/en/dashboard"
+  const currentLocale = pathname.split('/')[1] || 'en'
+
+  // Get path without locale for comparison
+  const pathWithoutLocale = pathname.replace(new RegExp(`^/${currentLocale}`), '') || '/'
+
+  const handleNavigate = (href: string) => {
+    // Always use the current locale from pathname, not from hook
+    const fullHref = `/${currentLocale}${href}`
+    startTransition(() => {
+      router.push(fullHref)
+      setMobileOpen(false)
+    })
+  }
 
   const renderItem = (item: { key: string; href: string; icon: any }) => {
     const Icon = item.icon
@@ -69,12 +83,11 @@ export function Sidebar() {
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
           collapsed && 'justify-center px-2',
         )}
-        asChild
+        onClick={() => handleNavigate(item.href)}
+        disabled={isPending}
       >
-        <Link href={`/${locale}${item.href}`}>
-          <Icon className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>{t(item.key)}</span>}
-        </Link>
+        <Icon className="h-5 w-5 flex-shrink-0" />
+        {!collapsed && <span>{t(item.key)}</span>}
       </Button>
     )
   }

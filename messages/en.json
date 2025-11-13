@@ -6,6 +6,7 @@
     "checkin": "Check-In Items",
     "addItem": "Add New Item",
     "aiScanner": "AI Scanner",
+    "dispatch": "Dispatch & Label",
     "reports": "Reports",
     "overview": "Overview",
     "operations": "Operations",
@@ -18,7 +19,27 @@
     "activeOrders": "Active Orders",
     "monthlyRevenue": "Monthly Revenue",
     "totalCustomers": "Total Customers",
-    "recentActivities": "Recent Activities"
+    "recentActivities": "Recent Activities",
+    "fromLastMonth": "from last month",
+    "pendingPickup": "pending pickup",
+    "newThisMonth": "new this month",
+    "orderId": "Order ID",
+    "customer": "Customer",
+    "service": "Service",
+    "status": "Status",
+    "amount": "Amount",
+    "date": "Date",
+    "services": {
+      "dryCleaning": "Dry Cleaning",
+      "washFold": "Wash & Fold",
+      "ironing": "Ironing Service"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "delivered": "Delivered"
+    }
   },
   "customers": {
     "title": "Customers",

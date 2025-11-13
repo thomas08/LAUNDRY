@@ -6,6 +6,7 @@
     "checkin": "รับคืนสินค้า",
     "addItem": "เพิ่มสินค้าใหม่",
     "aiScanner": "เครื่องสแกน AI",
+    "dispatch": "จัดส่งและฉลาก",
     "reports": "รายงาน",
     "overview": "ภาพรวม",
     "operations": "การดำเนินงาน",
@@ -18,7 +19,27 @@
     "activeOrders": "ออเดอร์ที่ดำเนินการ",
     "monthlyRevenue": "รายได้รายเดือน",
     "totalCustomers": "ลูกค้าทั้งหมด",
-    "recentActivities": "กิจกรรมล่าสุด"
+    "recentActivities": "กิจกรรมล่าสุด",
+    "fromLastMonth": "จากเดือนที่แล้ว",
+    "pendingPickup": "รอรับสินค้า",
+    "newThisMonth": "รายใหม่เดือนนี้",
+    "orderId": "รหัสออเดอร์",
+    "customer": "ลูกค้า",
+    "service": "บริการ",
+    "status": "สถานะ",
+    "amount": "จำนวนเงิน",
+    "date": "วันที่",
+    "services": {
+      "dryCleaning": "ซักแห้ง",
+      "washFold": "ซักและพับ",
+      "ironing": "บริการรีดผ้า"
+    },
+    "statuses": {
+      "pending": "รอดำเนินการ",
+      "processing": "กำลังดำเนินการ",
+      "completed": "เสร็จสิ้น",
+      "delivered": "ส่งแล้ว"
+    }
   },
   "customers": {
     "title": "ลูกค้า",
