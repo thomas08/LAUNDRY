@@ -1,0 +1,814 @@
+openapi: 3.0.3
+info:
+  title: LinenFlow™ API
+  description: |
+    RESTful API for LinenFlow™ Laundry Management System
+
+    ## Features
+    - Multi-tenancy with branch isolation
+    - Role-based access control (RBAC)
+    - AI-powered quality control
+    - RFID tag management
+    - Real-time inventory tracking
+
+    ## Authentication
+    All endpoints require JWT Bearer token authentication except for `/auth/login`.
+
+    ## Multi-Tenancy
+    - All data is scoped to branches (`branchId`)
+    - Superadmin can access all branches
+    - Admin can access assigned branches
+    - Regular users can only access their primary branch
+
+  version: 1.0.0
+  contact:
+    name: LinenFlow™ API Support
+    email: api@linenflow.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.linenflow.com/v1
+    description: Production server
+  - url: https://staging-api.linenflow.com/v1
+    description: Staging server
+  - url: http://localhost:8080/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Customers
+    description: Customer management
+  - name: Inventory
+    description: Linen inventory management
+  - name: RFID
+    description: RFID tag scanning and processing
+  - name: QC (Quality Control)
+    description: AI-powered quality control and validation
+  - name: Orders
+    description: Order management and tracking
+  - name: Dispatch
+    description: Label printing and dispatch management
+  - name: Reports
+    description: Analytics and reporting
+  - name: Users
+    description: User management (admin only)
+  - name: Branches
+    description: Branch/Location management (superadmin only)
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==========================================
+  # Authentication
+  # ==========================================
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and receive JWT token
+      security: []  # No auth required for login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@linenflow.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePassword123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT access token
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refreshToken:
+                    type: string
+                    description: JWT refresh token
+                  expiresIn:
+                    type: integer
+                    description: Token expiration time in seconds
+                    example: 3600
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get new access token using refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expiresIn:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Get authenticated user information
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # Customers
+  # ==========================================
+  /customers:
+    get:
+      tags:
+        - Customers
+      summary: List customers
+      description: Get list of customers filtered by branch access
+      parameters:
+        - name: branchId
+          in: query
+          description: Filter by specific branch (optional for superadmin)
+          schema:
+            type: string
+            example: branch-1
+        - name: search
+          in: query
+          description: Search by name, email, or phone
+          schema:
+            type: string
+            example: John
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            default: 20
+            example: 20
+        - name: offset
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            default: 0
+            example: 0
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+                  total:
+                    type: integer
+                    description: Total number of customers
+                    example: 150
+                  limit:
+                    type: integer
+                    example: 20
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Customers
+      summary: Create customer
+      description: Create a new customer (requires 'create' permission)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - branchId
+                - email
+                - phone
+              properties:
+                name:
+                  type: string
+                  example: John Doe Hotel
+                contactPerson:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@hotel.com
+                phone:
+                  type: string
+                  example: "+66-2-123-4567"
+                branchId:
+                  type: string
+                  description: Branch ID this customer belongs to
+                  example: branch-1
+      responses:
+        '201':
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /customers/{id}:
+    get:
+      tags:
+        - Customers
+      summary: Get customer
+      description: Get customer by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: customer-123
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    put:
+      tags:
+        - Customers
+      summary: Update customer
+      description: Update customer information (requires 'update' permission)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                contactPerson:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags:
+        - Customers
+      summary: Delete customer
+      description: Delete customer (requires 'delete' permission - admin/superadmin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Customer deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ==========================================
+  # Inventory
+  # ==========================================
+  /inventory:
+    get:
+      tags:
+        - Inventory
+      summary: List inventory items
+      description: Get list of linen items with filtering
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [In Stock, Washing, On-Rent]
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search by tag ID or type
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of inventory items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LinenItem'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      tags:
+        - Inventory
+      summary: Add inventory item
+      description: Add new linen item to inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tagId
+                - type
+                - branchId
+                - customerId
+              properties:
+                tagId:
+                  type: string
+                  example: LN001
+                type:
+                  type: string
+                  example: Bed Sheet
+                customerId:
+                  type: string
+                branchId:
+                  type: string
+                status:
+                  type: string
+                  enum: [In Stock, Washing, On-Rent]
+                  default: In Stock
+                washCycles:
+                  type: integer
+                  default: 0
+      responses:
+        '201':
+          description: Item added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinenItem'
+
+  /inventory/{tagId}:
+    get:
+      tags:
+        - Inventory
+      summary: Get item by tag ID
+      parameters:
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Item details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinenItem'
+
+    patch:
+      tags:
+        - Inventory
+      summary: Update item status
+      parameters:
+        - name: tagId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [In Stock, Washing, On-Rent]
+                washCycles:
+                  type: integer
+      responses:
+        '200':
+          description: Item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinenItem'
+
+  # ==========================================
+  # RFID
+  # ==========================================
+  /rfid/scan:
+    post:
+      tags:
+        - RFID
+      summary: Process RFID scan
+      description: Process multiple RFID tags from UHF scanner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tagIds
+                - scanType
+                - branchId
+              properties:
+                tagIds:
+                  type: array
+                  items:
+                    type: string
+                  example: ["LN001", "LN002", "LN003"]
+                scanType:
+                  type: string
+                  enum: [checkin, checkout, inventory]
+                  example: checkin
+                branchId:
+                  type: string
+                  example: branch-1
+                scannedBy:
+                  type: string
+                  description: User ID who performed the scan
+      responses:
+        '200':
+          description: Scan processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  successful:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LinenItem'
+                  failed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tagId:
+                          type: string
+                        reason:
+                          type: string
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      successful:
+                        type: integer
+                      failed:
+                        type: integer
+
+  # ==========================================
+  # QC (Quality Control) - AI
+  # ==========================================
+  /qc/validate:
+    post:
+      tags:
+        - QC (Quality Control)
+      summary: AI quality validation
+      description: |
+        Validate linen cleanliness using AI computer vision
+
+        **Process:**
+        1. Frontend captures image of linen item
+        2. Image is sent as base64 encoded string
+        3. AI model analyzes image for cleanliness
+        4. Returns validation result with confidence score
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - imageBase64
+                - tagId
+              properties:
+                imageBase64:
+                  type: string
+                  description: Base64 encoded image
+                  example: data:image/jpeg;base64,/9j/4AAQSkZJRg...
+                tagId:
+                  type: string
+                  example: LN001
+                branchId:
+                  type: string
+                  example: branch-1
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tagId:
+                    type: string
+                    example: LN001
+                  isClean:
+                    type: boolean
+                    example: true
+                  confidence:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 1
+                    example: 0.95
+                    description: AI confidence score (0-1)
+                  defects:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [stain, tear, discoloration, damage]
+                          example: stain
+                        location:
+                          type: string
+                          example: top-left
+                        severity:
+                          type: string
+                          enum: [low, medium, high]
+                          example: medium
+                  aiModel:
+                    type: string
+                    example: linen-qc-v2.1
+                  processedAt:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: user-123
+        email:
+          type: string
+          format: email
+          example: admin@linenflow.com
+        name:
+          type: string
+          example: John Doe
+        role:
+          type: string
+          enum: [superadmin, admin, user]
+          example: admin
+        branchId:
+          type: string
+          example: branch-1
+        branchIds:
+          type: array
+          items:
+            type: string
+          description: Multiple branches for admin/superadmin
+          example: ["branch-1", "branch-2"]
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          example: customer-123
+        name:
+          type: string
+          example: Riverside Hotel
+        contactPerson:
+          type: string
+          example: James Wilson
+        email:
+          type: string
+          format: email
+          example: james@riversidehotel.com
+        phone:
+          type: string
+          example: "+66-2-123-4567"
+        branchId:
+          type: string
+          example: branch-1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LinenItem:
+      type: object
+      properties:
+        tagId:
+          type: string
+          example: LN001
+        type:
+          type: string
+          example: Bed Sheet
+        customerId:
+          type: string
+          example: customer-123
+        branchId:
+          type: string
+          example: branch-1
+        status:
+          type: string
+          enum: [In Stock, Washing, On-Rent]
+          example: In Stock
+        washCycles:
+          type: integer
+          example: 5
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Invalid input data
+        code:
+          type: string
+          example: INVALID_INPUT
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Bad Request
+            message: Invalid input data
+            code: INVALID_INPUT
+
+    Unauthorized:
+      description: Unauthorized - Invalid or missing token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+            message: Invalid or missing authentication token
+            code: AUTH_REQUIRED
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Forbidden
+            message: Insufficient permissions to perform this action
+            code: PERMISSION_DENIED
+
+    NotFound:
+      description: Not found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not Found
+            message: Resource not found
+            code: NOT_FOUND
