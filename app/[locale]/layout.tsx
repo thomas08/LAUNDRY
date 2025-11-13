@@ -8,6 +8,8 @@ import { Analytics } from "@vercel/analytics/next"
 import { Sidebar } from "@/components/sidebar"
 import { Suspense } from "react"
 import { locales } from '../../i18n/config';
+import { AuthProvider } from "@/contexts/AuthContext";
+import { BranchProvider } from "@/contexts/BranchContext";
 
 type Props = {
   children: React.ReactNode;
@@ -29,13 +31,17 @@ export default async function LocaleLayout({
   return (
     <div className={`font-sans ${GeistSans.variable} ${GeistMono.variable} dark min-h-screen bg-background`} lang={locale}>
       <NextIntlClientProvider messages={messages} locale={locale}>
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 w-full md:pl-64 pt-16 md:pt-0">{children}</main>
-          </div>
-        </Suspense>
-        <Analytics />
+        <AuthProvider>
+          <BranchProvider>
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+              <div className="flex min-h-screen">
+                <Sidebar />
+                <main className="flex-1 w-full md:pl-64 pt-16 md:pt-0">{children}</main>
+              </div>
+            </Suspense>
+            <Analytics />
+          </BranchProvider>
+        </AuthProvider>
       </NextIntlClientProvider>
     </div>
   )
