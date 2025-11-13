@@ -28,7 +28,7 @@ export default async function LocaleLayout({
 
   return (
     <div className={`font-sans ${GeistSans.variable} ${GeistMono.variable} dark min-h-screen bg-background`} lang={locale}>
-      <NextIntlClientProvider messages={messages}>
+      <NextIntlClientProvider messages={messages} locale={locale}>
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
           <div className="flex min-h-screen">
             <Sidebar />
