@@ -1,12 +1,12 @@
 "use client"
 
-import { usePathname, useRouter } from "next/navigation"
+import { Link, usePathname } from "@/lib/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
-import { useState, useTransition } from "react"
+import { useState } from "react"
 
 const groupedNavigation = [
   {
@@ -46,31 +46,13 @@ const groupedNavigation = [
 export function Sidebar() {
   const t = useTranslations('nav')
   const pathname = usePathname()
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
 
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Extract current locale directly from pathname - this is the source of truth
-  // pathname is like "/th/customers" or "/en/dashboard"
-  const currentLocale = pathname.split('/')[1] || 'en'
-
-  // Get path without locale for comparison
-  const pathWithoutLocale = pathname.replace(new RegExp(`^/${currentLocale}`), '') || '/'
-
-  const handleNavigate = (href: string) => {
-    // Always use the current locale from pathname, not from hook
-    const fullHref = `/${currentLocale}${href}`
-    startTransition(() => {
-      router.push(fullHref)
-      setMobileOpen(false)
-    })
-  }
-
   const renderItem = (item: { key: string; href: string; icon: any }) => {
     const Icon = item.icon
-    const isActive = pathWithoutLocale === item.href
+    const isActive = pathname === item.href
 
     return (
       <Button
@@ -83,11 +65,12 @@ export function Sidebar() {
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
           collapsed && 'justify-center px-2',
         )}
-        onClick={() => handleNavigate(item.href)}
-        disabled={isPending}
+        asChild
       >
-        <Icon className="h-5 w-5 flex-shrink-0" />
-        {!collapsed && <span>{t(item.key)}</span>}
+        <Link href={item.href} onClick={() => setMobileOpen(false)}>
+          <Icon className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span>{t(item.key)}</span>}
+        </Link>
       </Button>
     )
   }

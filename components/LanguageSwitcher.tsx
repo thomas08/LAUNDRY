@@ -1,7 +1,8 @@
 'use client'
 
 import { useTransition } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname } from '@/lib/navigation'
+import { useLocale } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -19,25 +20,17 @@ const locales = [
 export function LanguageSwitcher() {
   const router = useRouter()
   const pathname = usePathname()
+  const currentLocale = useLocale()
   const [isPending, startTransition] = useTransition()
-
-  // Extract current locale directly from pathname - this is the source of truth
-  // pathname is like "/th/customers" or "/en/dashboard"
-  const currentLocale = pathname.split('/')[1] || 'en'
 
   const switchLanguage = (newLocale: string) => {
     // Avoid switching to same locale
     if (newLocale === currentLocale) return
 
-    // Get path without current locale
-    const pathWithoutLocale = pathname.replace(new RegExp(`^/${currentLocale}`), '') || '/'
-
-    // Create new path with new locale
-    const newPath = `/${newLocale}${pathWithoutLocale}`
-
     // Use startTransition for smooth navigation
+    // next-intl's router automatically handles locale switching
     startTransition(() => {
-      router.replace(newPath)
+      router.replace(pathname, { locale: newLocale as any })
     })
   }
 

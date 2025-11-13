@@ -51,9 +51,41 @@ The project is **"LinenFlow™"**, a comprehensive dashboard for a large-scale l
 3.  **Explain Your Changes:** After providing the code, add a brief, clear explanation of the key changes you made. For example: "I've added `useState` to manage the activities data and marked the component with `'use client'`. I also created a placeholder `fetchActivities` function inside a `useEffect` hook."
 
 **9. Internationalization (i18n)**
-- **Library:** We are using `next-intl` for internationalization.
+- **Library:** We are using `next-intl` (v4.3.12) for internationalization.
 - **Locales:** The primary locales are `en` (English, default) and `th` (Thai).
 - **Routing:** All routes MUST be prefixed with the locale. The file structure is `app/[locale]/...`.
 - **Message Files:** Translation strings are stored in JSON files under the `/messages` directory (e.g., `/messages/en.json`, `/messages/th.json`).
 - **Coding Pattern:** All user-facing text in components MUST be retrieved using the `useTranslations` hook from `next-intl`. Do not use hardcoded text. Components requiring this hook must be client components (`'use client'`).
-**Navigation Rule:** All internal navigation links (like in the Sidebar) MUST use the `Link` component imported from `next-intl/navigation`, NOT from `next/link`. This ensures the locale is preserved when changing pages. We must also use `usePathname` from `next-intl/navigation` to detect the active page.
+
+**Navigation Setup (IMPORTANT):**
+We use `createNavigation` from `next-intl/navigation` to generate locale-aware navigation helpers. These are defined in `/lib/navigation.ts`:
+
+```typescript
+import { createNavigation } from 'next-intl/navigation';
+import { locales, defaultLocale } from '@/i18n/config';
+
+export const { Link, usePathname, useRouter, redirect, permanentRedirect } =
+  createNavigation({
+    locales,
+    defaultLocale,
+    localePrefix: 'always'
+  });
+```
+
+**Navigation Rules:**
+1. **ALL internal navigation links MUST use the `Link` component from `@/lib/navigation`, NOT from `next/link`**. This ensures the locale is automatically preserved when navigating.
+2. **Use `usePathname` from `@/lib/navigation`** to get the current pathname (without locale prefix) for detecting active pages.
+3. **Use `useRouter` from `@/lib/navigation`** for programmatic navigation with locale support.
+4. The `Link`, `usePathname`, and `useRouter` from `@/lib/navigation` automatically handle locale prefixing - you don't need to manually add `/${locale}` to paths.
+
+**Example:**
+```typescript
+import { Link, usePathname } from '@/lib/navigation'
+
+// Link automatically includes current locale
+<Link href="/customers">Customers</Link>
+
+// usePathname returns path without locale (e.g., "/customers" not "/en/customers")
+const pathname = usePathname()
+const isActive = pathname === '/customers'
+```
