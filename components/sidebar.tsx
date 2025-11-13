@@ -3,7 +3,7 @@
 import { Link, usePathname } from "@/lib/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck } from "lucide-react"
+import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { useState } from "react"
@@ -24,6 +24,7 @@ const groupedNavigation = [
       { key: 'addItem', href: '/add-item', icon: Plus },
       { key: 'aiScanner', href: '/ai-scanner', icon: Camera },
       { key: 'dispatch', href: '/operations/dispatch', icon: Truck },
+      { key: 'jobOrders', href: '/operations/job-orders', icon: FileText, translationNamespace: 'operations' },
     ],
   },
   {
@@ -32,6 +33,17 @@ const groupedNavigation = [
     items: [
       { key: 'customers', href: '/customers', icon: Users },
       { key: 'inventory', href: '/inventory', icon: Package },
+      { key: 'stock', href: '/inventory/stock', icon: Boxes, translationNamespace: 'inventoryManagement' },
+      { key: 'suppliers', href: '/inventory/suppliers', icon: Building2, translationNamespace: 'suppliers', titleKey: 'title' },
+    ],
+  },
+  {
+    groupKey: 'finance',
+    titleKey: 'finance',
+    translationNamespace: 'finance',
+    items: [
+      { key: 'expenses', href: '/finance/expenses', icon: DollarSign, translationNamespace: 'finance' },
+      { key: 'invoices', href: '/finance/invoices', icon: Receipt, translationNamespace: 'finance' },
     ],
   },
   {
@@ -44,15 +56,33 @@ const groupedNavigation = [
 ]
 
 export function Sidebar() {
-  const t = useTranslations('nav')
+  const tNav = useTranslations('nav')
+  const tOps = useTranslations('operations')
+  const tInv = useTranslations('inventoryManagement')
+  const tSup = useTranslations('suppliers')
+  const tFin = useTranslations('finance')
   const pathname = usePathname()
 
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const renderItem = (item: { key: string; href: string; icon: any }) => {
+  const renderItem = (item: { key: string; href: string; icon: any; translationNamespace?: string; titleKey?: string }) => {
     const Icon = item.icon
     const isActive = pathname === item.href
+
+    // Select the appropriate translation function based on namespace
+    let label = item.key
+    if (item.translationNamespace === 'operations') {
+      label = tOps(item.key)
+    } else if (item.translationNamespace === 'inventoryManagement') {
+      label = tInv(item.key)
+    } else if (item.translationNamespace === 'suppliers') {
+      label = tSup(item.titleKey || item.key)
+    } else if (item.translationNamespace === 'finance') {
+      label = tFin(item.key)
+    } else {
+      label = tNav(item.key)
+    }
 
     return (
       <Button
@@ -69,7 +99,7 @@ export function Sidebar() {
       >
         <Link href={item.href} onClick={() => setMobileOpen(false)}>
           <Icon className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>{t(item.key)}</span>}
+          {!collapsed && <span>{label}</span>}
         </Link>
       </Button>
     )
@@ -137,17 +167,27 @@ export function Sidebar() {
 
           {/* Grouped Navigation */}
           <nav className={cn('flex-1 space-y-4 overflow-y-auto', collapsed ? 'px-2 py-4' : 'p-4')}>
-            {groupedNavigation.map((group) => (
-              <div key={group.groupKey} className="space-y-2">
-                {!collapsed && (
-                  <h4 className="px-3 text-xs font-semibold uppercase text-muted-foreground">{t(group.titleKey)}</h4>
-                )}
+            {groupedNavigation.map((group) => {
+              // Select the appropriate translation function for group title
+              let groupTitle = group.titleKey
+              if (group.translationNamespace === 'finance') {
+                groupTitle = tFin('title')
+              } else {
+                groupTitle = tNav(group.titleKey)
+              }
 
-                <div className="space-y-1">
-                  {group.items.map((item) => renderItem(item))}
+              return (
+                <div key={group.groupKey} className="space-y-2">
+                  {!collapsed && (
+                    <h4 className="px-3 text-xs font-semibold uppercase text-muted-foreground">{groupTitle}</h4>
+                  )}
+
+                  <div className="space-y-1">
+                    {group.items.map((item) => renderItem(item))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </nav>
 
           {/* Language Switcher and User section */}
