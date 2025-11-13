@@ -6,7 +6,10 @@
     "checkin": "Check-In Items",
     "addItem": "Add New Item",
     "aiScanner": "AI Scanner",
-    "reports": "Reports"
+    "reports": "Reports",
+    "overview": "Overview",
+    "operations": "Operations",
+    "management": "Management"
   },
   "dashboard": {
     "title": "Dashboard",

@@ -6,7 +6,10 @@
     "checkin": "รับคืนสินค้า",
     "addItem": "เพิ่มสินค้าใหม่",
     "aiScanner": "เครื่องสแกน AI",
-    "reports": "รายงาน"
+    "reports": "รายงาน",
+    "overview": "ภาพรวม",
+    "operations": "การดำเนินงาน",
+    "management": "การจัดการ"
   },
   "dashboard": {
     "title": "แดชบอร์ด",

@@ -1,12 +1,13 @@
 "use client"
 
-import { usePathname, Link } from "next-intl/navigation"
+import { usePathname } from "next/navigation"
+import Link from "next/link"
 import { useTranslations, useLocale } from "next-intl"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 
 const groupedNavigation = [
   {

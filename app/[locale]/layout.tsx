@@ -27,11 +27,13 @@ export default async function LocaleLayout({
   const messages = await getMessages({locale});
 
   return (
-    <div className={`font-sans ${GeistSans.variable} ${GeistMono.variable} dark min-h-screen`} lang={locale}>
+    <div className={`font-sans ${GeistSans.variable} ${GeistMono.variable} dark min-h-screen bg-background`} lang={locale}>
       <NextIntlClientProvider messages={messages}>
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-          <Sidebar />
-          <main className="md:pl-64">{children}</main>
+          <div className="flex min-h-screen">
+            <Sidebar />
+            <main className="flex-1 w-full md:pl-64 pt-16 md:pt-0">{children}</main>
+          </div>
         </Suspense>
         <Analytics />
       </NextIntlClientProvider>
