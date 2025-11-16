@@ -214,36 +214,36 @@ export default function SuppliersPage() {
       <div className="grid gap-4 md:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Suppliers</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('activeSuppliers')}</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalSuppliers}</div>
             <p className="text-xs text-muted-foreground">
-              {metrics.inactiveSuppliers} inactive
+              {t('inactiveCount', { count: metrics.inactiveSuppliers })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Payment Terms</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('avgPaymentTerms')}</CardTitle>
             <Phone className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.avgPaymentTerms} days</div>
-            <p className="text-xs text-muted-foreground">Credit period</p>
+            <div className="text-2xl font-bold">{metrics.avgPaymentTerms} {t('days')}</div>
+            <p className="text-xs text-muted-foreground">{t('creditPeriod')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('totalContacts')}</CardTitle>
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalSuppliers}</div>
-            <p className="text-xs text-muted-foreground">Supplier contacts</p>
+            <p className="text-xs text-muted-foreground">{t('supplierContacts')}</p>
           </CardContent>
         </Card>
       </div>
@@ -251,8 +251,8 @@ export default function SuppliersPage() {
       {/* Search Filter */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-lg">Search & Filter</CardTitle>
-          <CardDescription>Find suppliers by name, code, contact, or email</CardDescription>
+          <CardTitle className="text-lg">{t('searchAndFilter')}</CardTitle>
+          <CardDescription>{t('searchPlaceholder')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
@@ -268,7 +268,7 @@ export default function SuppliersPage() {
           </div>
 
           <div className="mt-4 text-sm text-muted-foreground">
-            Showing {filteredSuppliers.length} of {metrics.totalSuppliers} active suppliers
+            {t('showingOf', { count: filteredSuppliers.length, total: metrics.totalSuppliers })}
           </div>
         </CardContent>
       </Card>
@@ -284,15 +284,15 @@ export default function SuppliersPage() {
               <TableHead>{t('email')}</TableHead>
               <TableHead>{t('phone')}</TableHead>
               <TableHead className="text-right">{t('paymentTerms')}</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('status')}</TableHead>
+              <TableHead className="text-right">{t('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedSuppliers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? "No suppliers match your search" : "No suppliers found"}
+                  {searchQuery ? t('noMatchingSuppliers') : t('noSuppliersFound')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -327,11 +327,11 @@ export default function SuppliersPage() {
                     </a>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge variant="outline">{supplier.paymentTerms} days</Badge>
+                    <Badge variant="outline">{supplier.paymentTerms} {t('days')}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={supplier.isActive ? "default" : "secondary"}>
-                      {supplier.isActive ? "Active" : "Inactive"}
+                      {supplier.isActive ? t('active') : t('inactive')}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -366,7 +366,7 @@ export default function SuppliersPage() {
         {filteredSuppliers.length > itemsPerPage && (
           <div className="flex items-center justify-between px-6 py-4 border-t">
             <div className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
+              {t('pageOf', { current: currentPage, total: totalPages })}
             </div>
             <div className="flex gap-2">
               <Button
@@ -375,7 +375,7 @@ export default function SuppliersPage() {
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
-                Previous
+                {tCommon('previous')}
               </Button>
               <Button
                 variant="outline"
@@ -383,7 +383,7 @@ export default function SuppliersPage() {
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
               >
-                Next
+                {tCommon('next')}
               </Button>
             </div>
           </div>
@@ -394,8 +394,8 @@ export default function SuppliersPage() {
       {paginatedSuppliers.length > 0 && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-lg">Additional Information</CardTitle>
-            <CardDescription>Tax ID and addresses of suppliers</CardDescription>
+            <CardTitle className="text-lg">{t('additionalInfo')}</CardTitle>
+            <CardDescription>{t('taxIdAndAddresses')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -413,7 +413,7 @@ export default function SuppliersPage() {
                     </div>
                     {supplier.taxId && (
                       <div className="mt-1 text-sm">
-                        <span className="text-muted-foreground">Tax ID:</span>{" "}
+                        <span className="text-muted-foreground">{t('taxId')}:</span>{" "}
                         <span className="font-mono">{supplier.taxId}</span>
                       </div>
                     )}

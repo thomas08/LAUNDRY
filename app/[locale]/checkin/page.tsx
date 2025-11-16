@@ -1,6 +1,10 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
+import { useTranslations } from 'next-intl'
+import { useAuth, useUser } from '@/contexts/AuthContext'
+import { useBranch } from '@/contexts/BranchContext'
+import { filterByBranchAccess } from '@/lib/auth'
 import { LinenItem } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -8,78 +12,129 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Scan, Plus, CheckCircle, AlertCircle } from "lucide-react"
+import { Scan, Plus, CheckCircle, AlertCircle, Users, TrendingUp } from "lucide-react"
+
+// Mock linen inventory data for check-in (items currently on rent)
+const mockRentedItems: (LinenItem & { branchId: string; customerName?: string })[] = [
+  // Bangkok Central (branch-1)
+  {
+    id: "linen-002",
+    tagId: "LN002",
+    type: "towel",
+    customerId: "cust-002",
+    customerName: "Grand Palace Hotel",
+    status: "on_rent",
+    washCycles: 8,
+    branchId: "branch-1",
+    createdAt: "2023-07-20T11:30:00Z"
+  },
+  {
+    id: "linen-005",
+    tagId: "LN005",
+    type: "pillow_case",
+    customerId: "cust-004",
+    customerName: "Silom Business Hotel",
+    status: "on_rent",
+    washCycles: 22,
+    branchId: "branch-1",
+    createdAt: "2023-10-12T16:20:00Z"
+  },
+
+  // Chiang Mai (branch-2)
+  {
+    id: "linen-009",
+    tagId: "LN009",
+    type: "bed_sheet",
+    customerId: "cust-008",
+    customerName: "Ping River View Hotel",
+    status: "on_rent",
+    washCycles: 14,
+    branchId: "branch-2",
+    createdAt: "2023-09-30T11:00:00Z"
+  },
+
+  // Phuket (branch-3)
+  {
+    id: "linen-011",
+    tagId: "LN011",
+    type: "bed_sheet",
+    customerId: "cust-011",
+    customerName: "Patong Beach Resort",
+    status: "on_rent",
+    washCycles: 20,
+    branchId: "branch-3",
+    createdAt: "2023-06-28T14:15:00Z"
+  },
+  {
+    id: "linen-014",
+    tagId: "LN014",
+    type: "uniform",
+    customerId: "cust-015",
+    customerName: "Island Fitness Center",
+    status: "on_rent",
+    washCycles: 13,
+    branchId: "branch-3",
+    createdAt: "2023-09-05T16:45:00Z"
+  }
+]
 
 export default function CheckInPage() {
+  const t = useTranslations('checkin')
+  const tCommon = useTranslations('common')
+  const tInventory = useTranslations('inventory')
+  const { hasPermission } = useAuth()
+  const user = useUser()
+  const { currentBranch } = useBranch()
+
   const [tagId, setTagId] = useState("")
-  const [checkedInItems, setCheckedInItems] = useState<LinenItem[]>([])
+  const [checkedInItems, setCheckedInItems] = useState<(LinenItem & { branchId: string; customerName?: string })[]>([])
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Mock linen inventory data for lookup
-  const mockInventory: LinenItem[] = [
-    {
-      tagId: "LN001",
-      type: "Bed Sheet",
-      customerId: "1",
-      status: "On-Rent",
-      washCycles: 12,
-    },
-    {
-      tagId: "LN002",
-      type: "Towel",
-      customerId: "2",
-      status: "On-Rent",
-      washCycles: 8,
-    },
-    {
-      tagId: "LN005",
-      type: "Pillow Case",
-      customerId: "4",
-      status: "On-Rent",
-      washCycles: 22,
-    },
-    {
-      tagId: "LN009",
-      type: "Tablecloth",
-      customerId: "3",
-      status: "On-Rent",
-      washCycles: 15,
-    },
-  ]
+  // Filter items by branch access
+  const accessibleItems = useMemo(() => {
+    if (!user) return []
+    return filterByBranchAccess(user, mockRentedItems)
+  }, [user])
 
   const handleCheckIn = () => {
+    if (!hasPermission('create')) {
+      setAlert({ type: 'error', message: t('noPermission') })
+      setTimeout(() => setAlert(null), 3000)
+      return
+    }
+
     if (!tagId.trim()) {
-      setAlert({ type: 'error', message: 'Please enter a Tag ID' })
+      setAlert({ type: 'error', message: t('enterTagId') })
       return
     }
 
     // Check if item already checked in
     if (checkedInItems.some(item => item.tagId === tagId)) {
-      setAlert({ type: 'error', message: `Item ${tagId} has already been checked in` })
+      setAlert({ type: 'error', message: t('alreadyCheckedIn', { tagId }) })
       return
     }
 
-    // Find item in inventory
-    const item = mockInventory.find(item => item.tagId === tagId)
+    // Find item in accessible inventory
+    const item = accessibleItems.find(item => item.tagId === tagId)
 
     if (!item) {
-      setAlert({ type: 'error', message: `Item ${tagId} not found in inventory` })
+      setAlert({ type: 'error', message: t('itemNotFound', { tagId }) })
       return
     }
 
-    if (item.status !== 'On-Rent') {
-      setAlert({ type: 'error', message: `Item ${tagId} is not currently on rent (Status: ${item.status})` })
+    if (item.status !== 'on_rent') {
+      setAlert({ type: 'error', message: t('notOnRent', { tagId, status: item.status }) })
       return
     }
 
     // Create checked-in item with updated status
-    const checkedInItem: LinenItem = {
+    const checkedInItem = {
       ...item,
-      status: 'Washing'
+      status: 'washing' as const
     }
 
     setCheckedInItems(prev => [...prev, checkedInItem])
-    setAlert({ type: 'success', message: `Item ${tagId} successfully checked in` })
+    setAlert({ type: 'success', message: t('successMessage', { tagId }) })
     setTagId("")
 
     // Clear alert after 3 seconds
@@ -92,22 +147,47 @@ export default function CheckInPage() {
     }
   }
 
-  const getStatusColor = (status: LinenItem['status']) => {
-    switch (status) {
-      case 'Washing':
-        return "bg-chart-2/20 text-chart-2 border-chart-2/30"
-      case 'On-Rent':
-        return "bg-chart-4/20 text-chart-4 border-chart-4/30"
-      default:
-        return "bg-muted/20 text-muted-foreground border-muted/30"
+  const getLinenTypeKey = (type: string) => {
+    const typeMap: Record<string, string> = {
+      'bed_sheet': 'bedSheet',
+      'pillow_case': 'pillowCase',
+      'duvet_cover': 'duvetCover',
+      'tablecloth': 'tablecloth',
+      'towel': 'towel',
+      'bathrobe': 'bathrobe',
+      'uniform': 'uniform',
+      'napkin': 'napkin',
+      'curtain': 'curtain'
     }
+    return typeMap[type] || type
+  }
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const itemsCount = checkedInItems.length
+    const customersCount = new Set(checkedInItems.map(item => item.customerId)).size
+    const avgWashCycles = itemsCount > 0
+      ? Math.round(checkedInItems.reduce((sum, item) => sum + item.washCycles, 0) / itemsCount)
+      : 0
+
+    return { itemsCount, customersCount, avgWashCycles }
+  }, [checkedInItems])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen p-8">
+        <div className="flex items-center justify-center">
+          <div className="text-muted-foreground">{tCommon('loading')}</div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Check-In Linen Items</h1>
-        <p className="mt-2 text-muted-foreground">Process returned linen items and update their status</p>
+        <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
+        <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
       </div>
 
       {/* Check-in Form */}
@@ -115,30 +195,41 @@ export default function CheckInPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
             <Scan className="h-5 w-5" />
-            Scan or Enter Tag ID
+            {t('scanOrEnter')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
             <div className="flex-1">
               <Input
-                placeholder="Enter Tag ID (e.g., LN001)"
+                placeholder={t('placeholder')}
                 value={tagId}
                 onChange={(e) => setTagId(e.target.value.toUpperCase())}
                 onKeyPress={handleKeyPress}
                 className="text-lg"
                 autoFocus
+                disabled={!hasPermission('create')}
               />
             </div>
             <Button
               onClick={handleCheckIn}
               className="px-6"
               size="lg"
+              disabled={!hasPermission('create')}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Check In
+              {t('checkIn')}
             </Button>
           </div>
+
+          {!hasPermission('create') && (
+            <Alert className="mt-4 border-destructive bg-destructive/10">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">
+                {t('noPermission')}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {alert && (
             <Alert className={`mt-4 ${alert.type === 'success' ? 'border-chart-3 bg-chart-3/10' : 'border-destructive bg-destructive/10'}`}>
@@ -159,7 +250,7 @@ export default function CheckInPage() {
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-foreground">
-            Checked-in Items ({checkedInItems.length})
+            {t('checkedInItems')} ({checkedInItems.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -168,31 +259,46 @@ export default function CheckInPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">Tag ID</TableHead>
-                    <TableHead className="text-muted-foreground">Type</TableHead>
-                    <TableHead className="text-muted-foreground">Customer ID</TableHead>
-                    <TableHead className="text-muted-foreground">Previous Status</TableHead>
-                    <TableHead className="text-muted-foreground">New Status</TableHead>
-                    <TableHead className="text-muted-foreground">Wash Cycles</TableHead>
+                    <TableHead className="text-muted-foreground">{tInventory('tagId')}</TableHead>
+                    <TableHead className="text-muted-foreground">{tCommon('type')}</TableHead>
+                    <TableHead className="text-muted-foreground">{tCommon('customer')}</TableHead>
+                    <TableHead className="text-muted-foreground">{t('previousStatus')}</TableHead>
+                    <TableHead className="text-muted-foreground">{t('newStatus')}</TableHead>
+                    <TableHead className="text-muted-foreground">{tInventory('washCycles')}</TableHead>
+                    {user.role !== 'user' && <TableHead className="text-muted-foreground">{tCommon('branch')}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {checkedInItems.map((item, index) => (
                     <TableRow key={`${item.tagId}-${index}`} className="border-border hover:bg-accent/50">
                       <TableCell className="font-mono text-sm text-foreground">{item.tagId}</TableCell>
-                      <TableCell className="font-medium text-foreground">{item.type}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.customerId}</TableCell>
+                      <TableCell className="font-medium text-foreground">
+                        <Badge variant="outline">
+                          {tInventory(`types.${getLinenTypeKey(item.type)}` as any)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-xs truncate">
+                        {item.customerName || item.customerId}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="bg-chart-4/20 text-chart-4 border-chart-4/30">
-                          On-Rent
+                          {tInventory('status.onRent')}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getStatusColor(item.status)}>
-                          {item.status}
+                        <Badge variant="secondary">
+                          {tInventory('status.washing')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{item.washCycles}</TableCell>
+                      {user.role !== 'user' && (
+                        <TableCell>
+                          <Badge variant="outline">
+                            {item.branchId === 'branch-1' ? 'BKK01' :
+                             item.branchId === 'branch-2' ? 'CNX01' : 'HKT01'}
+                          </Badge>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -200,7 +306,7 @@ export default function CheckInPage() {
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No items checked in yet. Scan or enter a Tag ID above to get started.
+              {t('noItemsYet')}
             </div>
           )}
         </CardContent>
@@ -211,31 +317,36 @@ export default function CheckInPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <Card className="border-border bg-card">
             <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">{checkedInItems.length}</div>
-                <div className="text-sm text-muted-foreground">Items Checked In</div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-foreground">{stats.itemsCount}</div>
+                  <div className="text-sm text-muted-foreground">{t('itemsCheckedIn')}</div>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-500" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-border bg-card">
             <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">
-                  {new Set(checkedInItems.map(item => item.customerId)).size}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-foreground">{stats.customersCount}</div>
+                  <div className="text-sm text-muted-foreground">{tCommon('customers')}</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Customers</div>
+                <Users className="h-8 w-8 text-blue-500" />
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-border bg-card">
             <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">
-                  {Math.round(checkedInItems.reduce((sum, item) => sum + item.washCycles, 0) / checkedInItems.length)}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-foreground">{stats.avgWashCycles}</div>
+                  <div className="text-sm text-muted-foreground">{tCommon('average')} {tInventory('washCycles')}</div>
                 </div>
-                <div className="text-sm text-muted-foreground">Avg. Wash Cycles</div>
+                <TrendingUp className="h-8 w-8 text-orange-500" />
               </div>
             </CardContent>
           </Card>
