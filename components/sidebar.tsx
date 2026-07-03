@@ -1,12 +1,21 @@
 "use client"
 
-import { Link, usePathname } from "@/lib/navigation"
+import { Link, usePathname, useRouter } from "@/lib/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt } from "lucide-react"
+import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
+import { useAuth } from "@/contexts/AuthContext"
 import { useState } from "react"
+
+/** Build up-to-two-letter initials from a display name. */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 const groupedNavigation = [
   {
@@ -61,10 +70,18 @@ export function Sidebar() {
   const tInv = useTranslations('inventoryManagement')
   const tSup = useTranslations('suppliers')
   const tFin = useTranslations('finance')
+  const tNavRoot = useTranslations('nav')
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout } = useAuth()
 
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const handleLogout = () => {
+    logout()
+    router.replace('/login')
+  }
 
   const renderItem = (item: { key: string; href: string; icon: any; translationNamespace?: string; titleKey?: string }) => {
     const Icon = item.icon
@@ -203,14 +220,30 @@ export function Sidebar() {
             <div
               className={cn('flex items-center rounded-lg', collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5')}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">JD</div>
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+                {user ? getInitials(user.name) : '?'}
+              </div>
               {!collapsed && (
                 <div className="flex-1 overflow-hidden">
-                  <p className="truncate text-sm font-medium text-foreground">John Doe</p>
-                  <p className="truncate text-xs text-muted-foreground">john@laundry.com</p>
+                  <p className="truncate text-sm font-medium text-foreground">{user?.name ?? '—'}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user?.email ?? ''}</p>
                 </div>
               )}
             </div>
+
+            {/* Logout */}
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              title={tNavRoot('logout')}
+              className={cn(
+                'h-auto w-full justify-start gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                collapsed && 'justify-center px-2',
+              )}
+            >
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+              {!collapsed && <span>{tNavRoot('logout')}</span>}
+            </Button>
           </div>
         </div>
       </aside>

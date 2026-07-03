@@ -4,10 +4,10 @@ This repo deploys as three containers: **PostgreSQL**, the **backend API** (`bac
 and the **Next.js frontend** (root). The easiest path is the bundled
 `docker-compose.prod.yml`.
 
-> **Status note:** the frontend currently renders from mock data and does **not**
-> yet call the backend. Deploying gives you a running app + a working, independently
-> testable API (`/v1/auth/*`, `/v1/sync/*`). Wiring the frontend to the API is a
-> separate task (see "Next step" at the bottom).
+> **Status note:** the frontend's **authentication is integrated** with the backend
+> (real login/logout/refresh via `/v1/auth/*`). Business data pages (customers,
+> inventory, finance…) still render from mock data because the backend has no data
+> endpoints yet. Set `NEXT_PUBLIC_API_URL` so the browser can reach the API.
 
 ---
 
@@ -103,11 +103,11 @@ If the API is served under the same domain at `/v1`, set
 
 ---
 
-## Next step (not done yet)
+## Next step (remaining)
 
-The frontend still uses mock auth (`lib/auth.ts` `getCurrentUser()` returns a mock
-superadmin) and has no API client. To make it use the real backend:
-1. Add an API client in `lib/api/` that calls `NEXT_PUBLIC_API_URL`.
-2. Replace mock auth in `contexts/AuthContext.tsx` / `lib/auth.ts` with real
-   `/v1/auth/login` + token storage + `/v1/auth/me`.
+Authentication is done — real login/logout/refresh via `lib/api/` + `AuthContext`.
+What's left is the **business data**: customers, inventory, job orders, finance
+pages still read mock data. To finish:
+1. Build the backend data modules (routes/controllers/models mirroring `auth`/`sync`).
+2. Add matching `lib/api/*` modules using the existing `apiFetch` client.
 3. Swap mock data reads on each page for API calls (SWR/React Query recommended).

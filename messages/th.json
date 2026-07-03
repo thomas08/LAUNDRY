@@ -10,7 +10,22 @@
     "reports": "รายงาน",
     "overview": "ภาพรวม",
     "operations": "การดำเนินงาน",
-    "management": "การจัดการ"
+    "management": "การจัดการ",
+    "logout": "ออกจากระบบ"
+  },
+  "login": {
+    "title": "เข้าสู่ระบบ LinenFlow™",
+    "subtitle": "กรอกข้อมูลเพื่อเข้าใช้งาน",
+    "email": "อีเมล",
+    "emailPlaceholder": "you@example.com",
+    "emailInvalid": "กรุณากรอกอีเมลให้ถูกต้อง",
+    "password": "รหัสผ่าน",
+    "passwordPlaceholder": "รหัสผ่านของคุณ",
+    "passwordRequired": "กรุณากรอกรหัสผ่าน",
+    "submit": "เข้าสู่ระบบ",
+    "submitting": "กำลังเข้าสู่ระบบ...",
+    "invalidCredentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+    "genericError": "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง"
   },
   "dashboard": {
     "title": "แดชบอร์ด",

@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
-import { Sidebar } from "@/components/sidebar"
+import { AuthGuard } from "@/components/AuthGuard"
 import { Suspense } from "react"
 import { locales } from '../../i18n/config';
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -34,10 +34,7 @@ export default async function LocaleLayout({
         <AuthProvider>
           <BranchProvider>
             <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-              <div className="flex min-h-screen">
-                <Sidebar />
-                <main className="flex-1 w-full md:pl-64 pt-16 md:pt-0">{children}</main>
-              </div>
+              <AuthGuard>{children}</AuthGuard>
             </Suspense>
             <Analytics />
           </BranchProvider>

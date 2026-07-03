@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. The frontend still renders from **mock data** (`lib/auth.ts`, etc.) and is **not yet wired to the backend** — the backend currently implements auth and RFID sync only.
+This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/RBAC via `/v1/auth/*`); the business **data pages still render from mock data** because the backend has no data endpoints yet (only auth + RFID sync are implemented).
 
 ## Development Commands
 
@@ -27,7 +27,7 @@ There is no test framework in either project (`backend` `npm test` is a placehol
 
 ## Architecture Overview
 
-LinenFlow™ is a Next.js 15 laundry management system with comprehensive RBAC (Role-Based Access Control), multi-tenancy support, and full internationalization. The frontend runs on **mock data**; a separate Express/PostgreSQL backend (`backend/`) provides real auth and offline RFID sync but is not yet consumed by the frontend.
+LinenFlow™ is a Next.js 15 laundry management system with comprehensive RBAC (Role-Based Access Control), multi-tenancy support, and full internationalization. A separate Express/PostgreSQL backend (`backend/`) provides real auth and offline RFID sync. The frontend's **auth flow is fully integrated with the backend**; its business data pages still run on mock data pending backend data endpoints.
 
 **Critical Architecture Decisions:**
 - **External Backend Pattern**: No Next.js API routes (`app/api/` does not exist). The frontend calls (or will call) the standalone `backend/` service. Note: `docs/api/openapi.yaml` was written for a planned Rust backend and predates the actual Node/Express backend in `backend/` — treat the code in `backend/` as the source of truth for implemented endpoints.
@@ -146,13 +146,15 @@ filterByBranchAccess(user, customers)
 ### Context Providers
 
 **AuthContext** (`contexts/AuthContext.tsx`):
-- Provides: `user`, `hasPermission(permission)`, `canAccessPage(path)`, `login()`, `logout()`
+- Provides: `user`, `isLoading`, `isAuthenticated`, `hasPermission(permission)`, `canAccessPage(path)`, `login(email, password)`, `logout()`
 - Hooks: `useAuth()`, `useUser()`, `useRole(role)`
-- Currently returns mock superadmin (see `lib/auth.ts` `getCurrentUser()`)
+- **Real auth**: on mount it validates the stored token via `GET /v1/auth/me`; `login()` calls `POST /v1/auth/login` and stores JWT + refresh token; `logout()` clears them. Permission/branch checks are still derived client-side from the server-provided `role` (UI convenience — backend enforces). The mock helpers in `lib/auth.ts` (`getCurrentUser`, `mockUsers`, `isAuthenticated`) are now unused/deprecated; the RBAC helper functions there are still used.
+- **API layer**: `lib/api/` — `client.ts` (`apiFetch`, base URL from `NEXT_PUBLIC_API_URL`, silent 401→refresh→retry), `auth.ts` (login/me), `token-storage.ts` (localStorage). Route protection is client-side in `components/AuthGuard.tsx` (wraps the app shell in the locale layout; redirects to `/login`). Login page: `app/[locale]/login/page.tsx`.
 
 **BranchContext** (`contexts/BranchContext.tsx`):
 - Provides: `currentBranch`, `availableBranches`, `switchBranch(branchId)`
 - Hooks: `useBranch()`, `useCurrentBranchId()`, `useCurrentBranch()`
+- Derives accessible branches from the real logged-in user's `branchIds`, but branch **display details** (name/code/address) are still from a mock list — there is no "list branches" endpoint yet.
 - Mock branches: Bangkok Central (BKK01), Chiang Mai (CNX01), Phuket (HKT01)
 
 ### UI Pattern with RBAC
@@ -357,57 +359,37 @@ Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refr
 
 **Code note**: `backend/` source contains Thai-language comments explaining business rules — preserve/match that style when editing those files.
 
-## Frontend ↔ Backend Integration (In Progress)
+## Frontend ↔ Backend Integration
 
-### Current State
-- Frontend data is mocked (see `lib/auth.ts` `mockUsers`); `getCurrentUser()` returns mock superadmin
-- No API client in the frontend yet — the `backend/` auth+sync endpoints exist but nothing in `app/` calls them
+### Done — Authentication
+The full auth flow is integrated against the backend (see AuthContext / `lib/api/` above):
+real login page, JWT + refresh-token storage, silent token refresh on 401, `/me`
+session restore, client-side route guard, and logout. Set `NEXT_PUBLIC_API_URL`
+(see `.env.example`) to point the frontend at the API.
 
-### API Specification
-- **Location**: `docs/api/openapi.yaml`
-- **Documentation**: `docs/api/README.md`
-- **Endpoints**: Authentication, Customers, Inventory, RFID, QC
-- **Auth**: JWT Bearer tokens
-- **Multi-tenancy**: All mutations require `branchId`
+### Not done — Business data endpoints
+Customers, Inventory, Job Orders, Finance pages still read mock data. The backend
+has **no endpoints** for these yet, so integrating them requires building the backend
+modules first (routes → controllers → models, mirroring `auth`/`sync`).
 
-### Integration Pattern
+### Integration Pattern (for the data modules, when built)
 
-When ready to integrate backend:
-
-1. **Replace mock auth** in `lib/auth.ts`:
-```typescript
-// Replace getCurrentUser() to read from NextAuth.js or similar
-export function getCurrentUser(): User | null {
-  // Read from session instead of returning mockUsers.superadmin
-}
-```
-
-2. **Create API client** in `lib/api/`:
+1. **Add a data API module** in `lib/api/` using the existing `apiFetch` client
+   (it already attaches the Bearer token and handles refresh):
 ```typescript
 // lib/api/customers.ts
-export async function fetchCustomers(branchId?: string) {
-  const user = getCurrentUser()
-  const params = new URLSearchParams()
-  if (branchId) params.append('branchId', branchId)
-
-  const response = await fetch(`${API_URL}/customers?${params}`, {
-    headers: {
-      'Authorization': `Bearer ${user.token}`,
-      'Content-Type': 'application/json'
-    }
-  })
-
-  return response.json()
+import { apiFetch } from './client'
+export function fetchCustomers(branchId?: string) {
+  const qs = branchId ? `?branchId=${encodeURIComponent(branchId)}` : ''
+  return apiFetch<Customer[]>(`/customers${qs}`)
 }
 ```
 
-3. **Use SWR or React Query** for data fetching
+2. **Use SWR or React Query** for data fetching in the pages
 
-4. **Add environment variables**:
-```bash
-API_URL=https://api.linenflow.com/v1
-JWT_SECRET=...
-```
+3. **Environment variables**: the frontend already reads `NEXT_PUBLIC_API_URL`
+   (e.g. `https://api.linenflow.com/v1`) — see `.env.example`. No new frontend
+   env var is needed for additional data modules.
 
 ## Configuration Notes
 

@@ -1,19 +1,24 @@
 'use client'
 
 /**
- * AuthContext - Provides authentication state and user information
- * This is the central place for managing user authentication in the app
+ * AuthContext - Authentication state backed by the real backend API.
+ *
+ * On mount it validates any stored token via GET /v1/auth/me. login() calls
+ * POST /v1/auth/login and stores the tokens; logout() clears them.
+ *
+ * Permission/branch checks are derived client-side from the server-provided
+ * `role` (UI convenience only — the backend is the real enforcement point).
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { User, UserRole, Permission } from '@/lib/types'
 import {
-  getCurrentUser,
   hasPermission,
   canAccessPage,
   canPerformAction,
-  isAuthenticated
 } from '@/lib/auth'
+import { loginRequest, getMeRequest } from '@/lib/api/auth'
+import { setTokens, clearTokens, getAccessToken } from '@/lib/api/token-storage'
 
 interface AuthContextType {
   user: User | null
@@ -32,38 +37,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Validate the stored token (if any) on first load.
   useEffect(() => {
-    // Simulate loading user data
-    // In production, this would fetch from session/token
+    let cancelled = false
+
     const loadUser = async () => {
+      if (!getAccessToken()) {
+        if (!cancelled) setIsLoading(false)
+        return
+      }
       try {
-        if (isAuthenticated()) {
-          const currentUser = getCurrentUser()
-          setUser(currentUser)
-        }
+        const currentUser = await getMeRequest()
+        if (!cancelled) setUser(currentUser)
       } catch (error) {
-        console.error('Failed to load user:', error)
+        // Token invalid/expired and refresh failed — clear and stay logged out.
+        clearTokens()
+        if (!cancelled) setUser(null)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     loadUser()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const login = async (email: string, password: string) => {
-    // TODO: Implement real authentication
-    console.log('Login called with:', email)
+  const login = useCallback(async (email: string, password: string) => {
+    const { token, refreshToken, user: loggedInUser } = await loginRequest(email, password)
+    setTokens(token, refreshToken)
+    setUser(loggedInUser)
+  }, [])
 
-    // Mock login - in production, call your auth API
-    const mockUser = getCurrentUser()
-    setUser(mockUser)
-  }
-
-  const logout = () => {
-    // TODO: Implement real logout
+  const logout = useCallback(() => {
+    clearTokens()
     setUser(null)
-  }
+  }, [])
 
   const value: AuthContextType = {
     user,
