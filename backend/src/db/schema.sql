@@ -4,8 +4,12 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create enum for user roles
-CREATE TYPE user_role AS ENUM ('superadmin', 'admin', 'user');
+-- Create enum for user roles (idempotent so migrations can be re-run safely)
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM ('superadmin', 'admin', 'user');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Branches table
 CREATE TABLE IF NOT EXISTS branches (
@@ -87,9 +91,11 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Add triggers for updated_at
+-- Add triggers for updated_at (drop-then-create so re-running the schema is safe)
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_branches_updated_at ON branches;
 CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

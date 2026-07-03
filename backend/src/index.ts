@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/env';
 import { testDatabaseConnection, closeDatabaseConnection } from './config/database';
 import authRoutes from './routes/auth';
+import syncRoutes from './routes/sync';
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.get('/health', (_req: Request, _res: Response) => {
 
 // API v1 routes
 app.use('/v1/auth', authRoutes);
+app.use('/v1/sync', syncRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
@@ -78,6 +80,8 @@ async function startServer() {
 ║   POST   /v1/auth/login      - User login                ║
 ║   POST   /v1/auth/refresh    - Refresh token             ║
 ║   GET    /v1/auth/me         - Current user              ║
+║   POST   /v1/sync/batch      - Batch sync scan events    ║
+║   GET    /v1/sync/reference  - Get offline reference data║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
       `);

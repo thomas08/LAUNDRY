@@ -2,19 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository Layout
+
+This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. The frontend still renders from **mock data** (`lib/auth.ts`, etc.) and is **not yet wired to the backend** — the backend currently implements auth and RFID sync only.
+
 ## Development Commands
 
-- `pnpm dev` - Start development server
-- `pnpm build` - Build the application for production
+### Frontend (root)
+- `pnpm dev` - Start Next.js dev server (default port 3000)
+- `pnpm build` - Build for production
 - `pnpm start` - Start production server
-- `pnpm lint` - Run ESLint to check code quality
+- `pnpm lint` - Run ESLint
+
+### Backend (`cd backend`, uses npm not pnpm)
+- `npm run dev` - Start API with hot reload (`ts-node-dev`) on port 8080, base path `/v1`
+- `npm run build` - Compile TypeScript to `dist/`
+- `npm start` - Run compiled `dist/index.js`
+- `npm run db:migrate` - Run migrations against PostgreSQL (**requires `npm run build` first** — it executes the compiled `dist/db/migrate.js`). Runs `schema.sql` then every file in `migrations/` in filename order. All migrations are written idempotently, so this is safe to re-run. Default seeded superadmin: `admin@linenflow.com` / `Admin123!`.
+- `docker compose up -d` (in `backend/`) - Start the PostgreSQL 14 dev container (postgres/postgres, db `linenflow`, port 5432)
+
+**Deployment**: See `DEPLOYMENT.md`. `docker-compose.prod.yml` builds all three containers; the backend runs migrations on start. Both apps have Dockerfiles (frontend uses Next.js `output: 'standalone'`). The frontend requires `npm ci --legacy-peer-deps` (some Radix/vaul peers lag React 19).
+
+There is no test framework in either project (`backend` `npm test` is a placeholder that exits 1).
 
 ## Architecture Overview
 
-LinenFlow™ is a Next.js 15 laundry management system with comprehensive RBAC (Role-Based Access Control), multi-tenancy support, and full internationalization. The application is currently in **mock data mode** with a complete frontend architecture ready for backend integration via a documented Rust API.
+LinenFlow™ is a Next.js 15 laundry management system with comprehensive RBAC (Role-Based Access Control), multi-tenancy support, and full internationalization. The frontend runs on **mock data**; a separate Express/PostgreSQL backend (`backend/`) provides real auth and offline RFID sync but is not yet consumed by the frontend.
 
 **Critical Architecture Decisions:**
-- **External Backend Pattern**: No Next.js API routes (`app/api/` does not exist). All API contracts are defined in OpenAPI spec at `docs/api/openapi.yaml` for a separate Rust backend.
+- **External Backend Pattern**: No Next.js API routes (`app/api/` does not exist). The frontend calls (or will call) the standalone `backend/` service. Note: `docs/api/openapi.yaml` was written for a planned Rust backend and predates the actual Node/Express backend in `backend/` — treat the code in `backend/` as the source of truth for implemented endpoints.
 - **Two-Layer Layout System**: Root layout (`app/layout.tsx`) is minimal HTML shell; locale layout (`app/[locale]/layout.tsx`) contains all providers, sidebar, and theming.
 - **Mock-First Development**: All data is currently mocked but follows production patterns for easy API integration.
 
@@ -320,12 +336,32 @@ Comprehensive type definitions for entire business domain:
 
 **Import types from lib/types.ts, not from individual files**
 
-## Backend Integration (Future)
+## Backend Service (`backend/`)
+
+Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refresh tokens. Entry point `src/index.ts` mounts routes under `/v1` and exposes `/health`.
+
+**Layered structure** (routes → controllers → models):
+- `src/config/` — `env.ts` (all config from env vars, port 8080 default) and `database.ts` (pg `Pool` + `query()` / `transaction()` helpers — use these rather than talking to the pool directly)
+- `src/middleware/` — `auth.ts` (`authMiddleware` verifies JWT, populates `req.user` on the `AuthRequest` type) and `rbac.ts` (`requirePermission`, `requireRole`, `requireBranchAccess`)
+- `src/routes/` → `src/controllers/` → `src/models/` — thin routers delegate to controllers, which call model classes that own the SQL
+- `src/db/` — `schema.sql` (base tables), `migrate.ts` (runner: applies `schema.sql` then all `migrations/*.sql` in order), `migrations/` (additive, idempotent SQL). Write new migrations idempotently (`IF NOT EXISTS` / `DO $$ ... EXCEPTION WHEN duplicate_object` guards) since the runner re-applies everything each run.
+
+**Implemented endpoints:**
+- `POST /v1/auth/login`, `POST /v1/auth/refresh`, `GET /v1/auth/me`
+- `POST /v1/sync/batch` — handheld RFID devices upload a batch of offline-collected scan events
+- `GET /v1/sync/reference?branchId=...` — reference data for devices to cache for offline use
+
+**RBAC parity**: `backend/src/middleware/rbac.ts` mirrors the frontend role-permission matrix from `lib/auth.ts`. When you change permissions on one side, change both. **The backend is the real enforcement point** — frontend RBAC is UI-only.
+
+**Offline sync model** (`src/models/sync.ts`): the core domain logic. Scan events carry a `clientUuid` for **idempotency** (re-uploading the same batch is safe), and a server-side `ALLOWED_TRANSITIONS` map enforces valid linen-item status changes (`In Stock` → `Washing` → `On-Rent`), rejecting illegal transitions rather than trusting the device. `linen_items` rows carry a `version` column for optimistic concurrency. Note: `customer_id` / `job_order_id` are plain VARCHARs with **no FK constraints** yet — those modules don't exist in the DB; add constraints via `ALTER TABLE` when they do.
+
+**Code note**: `backend/` source contains Thai-language comments explaining business rules — preserve/match that style when editing those files.
+
+## Frontend ↔ Backend Integration (In Progress)
 
 ### Current State
-- All data is mocked (see `lib/auth.ts` `mockUsers`)
-- `getCurrentUser()` returns mock superadmin
-- No API client implementation
+- Frontend data is mocked (see `lib/auth.ts` `mockUsers`); `getCurrentUser()` returns mock superadmin
+- No API client in the frontend yet — the `backend/` auth+sync endpoints exist but nothing in `app/` calls them
 
 ### API Specification
 - **Location**: `docs/api/openapi.yaml`

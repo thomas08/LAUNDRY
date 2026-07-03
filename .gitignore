@@ -18,6 +18,9 @@ yarn-error.log*
 
 # env files
 .env*
+# ...but keep the example templates tracked
+!.env.example
+!.env.prod.example
 
 # vercel
 .vercel

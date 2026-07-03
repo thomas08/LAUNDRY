@@ -1,0 +1,67 @@
+# ── LinenFlow™ full-stack production stack ──────────────────────────────────
+# Usage:
+#   1. cp .env.prod.example .env.prod  &&  edit the secrets
+#   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# The backend container runs DB migrations on start (idempotent), so no manual
+# migration step is required.
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: linenflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No host port published by default — only the backend needs it on the
+    # internal network. Uncomment to expose for debugging.
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: linenflow-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      args:
+        # Public URL the browser uses to reach the API (inlined at build time)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: linenflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+    driver: local

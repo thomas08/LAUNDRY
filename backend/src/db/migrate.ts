@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { pool, closeDatabaseConnection } from '../config/database';
 import bcrypt from 'bcryptjs';
@@ -9,17 +9,27 @@ async function runMigration() {
   try {
     console.log('🔄 Running database migrations...');
 
-    // Read SQL schema file
+    // 1. Base schema (branches, users, refresh_tokens + seed data).
+    //    schema.sql is written idempotently so this is safe to re-run.
     const schemaPath = join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
+    console.log('   → schema.sql');
+    await client.query(readFileSync(schemaPath, 'utf-8'));
 
-    // Execute schema
-    await client.query(schema);
+    // 2. Incremental migrations in migrations/, applied in filename order.
+    //    Each file is expected to be idempotent (e.g. IF NOT EXISTS / DO $$ ... EXCEPTION guards).
+    const migrationsDir = join(__dirname, 'migrations');
+    if (existsSync(migrationsDir)) {
+      const files = readdirSync(migrationsDir)
+        .filter((f) => f.endsWith('.sql'))
+        .sort();
+      for (const file of files) {
+        console.log(`   → migrations/${file}`);
+        await client.query(readFileSync(join(migrationsDir, file), 'utf-8'));
+      }
+    }
 
-    // Hash password for default admin
+    // 3. Set the default admin password (schema.sql seeds a placeholder hash).
     const hashedPassword = await bcrypt.hash('Admin123!', 10);
-
-    // Update default admin password
     await client.query(
       `UPDATE users SET password_hash = $1 WHERE id = 'user-superadmin'`,
       [hashedPassword]

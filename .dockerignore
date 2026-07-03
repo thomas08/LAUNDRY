@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+build
+.git
+.env*
+!.env.example
+*.log
+.DS_Store
+backend
+npm-debug.log*
+.vercel
