@@ -83,6 +83,19 @@ export class UserModel {
     );
   }
 
+  // อัปเดตรหัสผ่าน (รับ hash ที่ผ่าน bcrypt แล้ว) + revoke refresh tokens ทั้งหมดของ user
+  // เพื่อบังคับให้ session อื่นๆ ต้อง login ใหม่หลังเปลี่ยนรหัส
+  static async updatePassword(userId: string, newHash: string): Promise<void> {
+    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+      newHash,
+      userId,
+    ]);
+    await query(
+      'UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND revoked_at IS NULL',
+      [userId]
+    );
+  }
+
   // Get user's accessible branches
   static getUserBranches(user: User): string[] {
     if (user.role === 'superadmin') {

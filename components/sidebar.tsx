@@ -3,7 +3,7 @@
 import { Link, usePathname, useRouter } from "@/lib/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut, Tag, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { useAuth } from "@/contexts/AuthContext"
@@ -42,6 +42,7 @@ const groupedNavigation = [
     items: [
       { key: 'customers', href: '/customers', icon: Users },
       { key: 'inventory', href: '/inventory', icon: Package },
+      { key: 'articles', href: '/inventory/articles', icon: Tag },
       { key: 'stock', href: '/inventory/stock', icon: Boxes, translationNamespace: 'inventoryManagement' },
       { key: 'suppliers', href: '/inventory/suppliers', icon: Building2, translationNamespace: 'suppliers', titleKey: 'title' },
     ],
@@ -230,6 +231,25 @@ export function Sidebar() {
                 </div>
               )}
             </div>
+
+            {/* Account settings */}
+            <Button
+              variant="ghost"
+              title={tNavRoot('account')}
+              className={cn(
+                'h-auto w-full justify-start gap-3 px-3 py-2.5 text-sm font-medium',
+                pathname === '/account'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                collapsed && 'justify-center px-2',
+              )}
+              asChild
+            >
+              <Link href="/account" onClick={() => setMobileOpen(false)}>
+                <Settings className="h-5 w-5 flex-shrink-0" />
+                {!collapsed && <span>{tNavRoot('account')}</span>}
+              </Link>
+            </Button>
 
             {/* Logout */}
             <Button

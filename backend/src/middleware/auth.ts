@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
 import { User, UserModel } from '../models/user';
@@ -27,11 +28,15 @@ export function generateAccessToken(user: User): string {
 }
 
 // Generate JWT refresh token
+// ใส่ jti (สุ่ม) เพื่อกันไม่ให้ token ซ้ำเมื่อ login หลายครั้งในวินาทีเดียวกัน
+// (iat ของ JWT ละเอียดแค่ระดับวินาที ถ้าไม่มี jti จะได้ token string เดียวกัน
+//  แล้วไปชน UNIQUE constraint ของ refresh_tokens.token -> 500)
 export function generateRefreshToken(user: User): string {
-  const payload: JWTPayload = {
+  const payload: JWTPayload & { jti: string } = {
     userId: user.id,
     email: user.email,
     role: user.role,
+    jti: randomUUID(),
   };
 
   return jwt.sign(payload, config.jwt.refreshSecret, {

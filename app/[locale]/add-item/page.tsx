@@ -1,335 +1,319 @@
 'use client'
 
-import { useState } from "react"
-import { LinenItem, Customer } from "@/lib/types"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Package, Plus, CheckCircle, AlertCircle, Save } from "lucide-react"
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
+import { Link } from '@/lib/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { useCurrentBranchId } from '@/contexts/BranchContext'
+import type { LinenArticle, LinenOwnership } from '@/lib/types'
+import { fetchArticles } from '@/lib/api/articles'
+import { syncBatch, buildRegistrationEvents, type SyncEventResult } from '@/lib/api/sync'
+import { ApiError } from '@/lib/api/client'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import {
+  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine,
+} from 'lucide-react'
 
-export default function AddItemPage() {
-  const [formData, setFormData] = useState({
-    tagId: '',
-    type: '',
-    customerId: '',
-    status: 'In Stock' as LinenItem['status'],
-    washCycles: 0
-  })
-  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [addedItems, setAddedItems] = useState<LinenItem[]>([])
+const DEVICE_ID = 'web-registration' // browser acts as the single scanner station (MVP)
+const OWNERSHIPS: LinenOwnership[] = ['rental', 'customer_owned']
 
-  // Mock customers for dropdown
-  const customers: Customer[] = [
-    { id: "1", name: "Sarah Johnson", contactPerson: "Sarah Johnson", email: "sarah.johnson@email.com", phone: "+1 (555) 123-4567" },
-    { id: "2", name: "Michael Chen", contactPerson: "Michael Chen", email: "michael.chen@email.com", phone: "+1 (555) 234-5678" },
-    { id: "3", name: "Emily Davis", contactPerson: "Emily Davis", email: "emily.davis@email.com", phone: "+1 (555) 345-6789" },
-    { id: "4", name: "Riverside Hotel", contactPerson: "James Wilson", email: "james.wilson@riversidehotel.com", phone: "+1 (555) 987-6543" },
-  ]
+interface RegResult extends SyncEventResult {
+  tagId: string
+}
 
-  // Common linen types
-  const linenTypes = [
-    "Bed Sheet", "Pillow Case", "Towel", "Bath Towel", "Tablecloth",
-    "Napkin", "Uniform", "Apron", "Curtain", "Blanket"
-  ]
+export default function RegisterLinenPage() {
+  const t = useTranslations('register')
+  const { hasPermission } = useAuth()
+  const branchId = useCurrentBranchId()
 
-  const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+  const [articles, setArticles] = useState<LinenArticle[]>([])
+  const [loadingArticles, setLoadingArticles] = useState(true)
+  const [articleId, setArticleId] = useState<string>('')
+  const [ownership, setOwnership] = useState<LinenOwnership>('rental')
+
+  const [singleTag, setSingleTag] = useState('')
+  const [batchInput, setBatchInput] = useState('')
+  const [batchTags, setBatchTags] = useState<string[]>([])
+
+  const [submitting, setSubmitting] = useState(false)
+  const [results, setResults] = useState<RegResult[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const selectedArticle = useMemo(
+    () => articles.find((a) => a.id === articleId) || null,
+    [articles, articleId]
+  )
+
+  const load = useCallback(async () => {
+    setLoadingArticles(true)
+    try {
+      const list = await fetchArticles(branchId ?? undefined)
+      setArticles(list)
+    } catch {
+      setArticles([])
+    } finally {
+      setLoadingArticles(false)
+    }
+  }, [branchId])
+
+  useEffect(() => { load() }, [load])
+
+  // Default the owner to the article's default when the article changes.
+  useEffect(() => {
+    if (selectedArticle) setOwnership(selectedArticle.defaultOwnership)
+  }, [selectedArticle])
+
+  const register = useCallback(
+    async (tagIds: string[]) => {
+      setError(null)
+      setResults([])
+      if (!branchId) { setError(t('noBranch')); return }
+      if (!selectedArticle) { setError(t('selectArticle')); return }
+      const cleaned = Array.from(new Set(tagIds.map((x) => x.trim().toUpperCase()).filter(Boolean)))
+      if (cleaned.length === 0) { setError(t('noTags')); return }
+
+      setSubmitting(true)
+      try {
+        const events = buildRegistrationEvents({
+          tagIds: cleaned,
+          branchId,
+          articleId: selectedArticle.id,
+          type: selectedArticle.name,
+          ownership,
+        })
+        const byUuid = new Map(events.map((e) => [e.clientUuid, e.tagId]))
+        const res = await syncBatch(DEVICE_ID, events)
+        setResults(res.map((r) => ({ ...r, tagId: byUuid.get(r.clientUuid) ?? '?' })))
+        return res
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : t('submitError'))
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [branchId, selectedArticle, ownership, t]
+  )
+
+  const submitSingle = async () => {
+    const tag = singleTag
+    const res = await register([tag])
+    if (res && res[0]?.result === 'applied') setSingleTag('')
   }
 
-  const validateForm = () => {
-    if (!formData.tagId.trim()) {
-      setAlert({ type: 'error', message: 'Tag ID is required' })
-      return false
-    }
-    if (!formData.type.trim()) {
-      setAlert({ type: 'error', message: 'Linen type is required' })
-      return false
-    }
-    if (!formData.customerId) {
-      setAlert({ type: 'error', message: 'Customer is required' })
-      return false
-    }
-    if (formData.washCycles < 0) {
-      setAlert({ type: 'error', message: 'Wash cycles cannot be negative' })
-      return false
-    }
-
-    // Check if tag ID already exists
-    if (addedItems.some(item => item.tagId === formData.tagId.toUpperCase())) {
-      setAlert({ type: 'error', message: `Tag ID ${formData.tagId.toUpperCase()} already exists` })
-      return false
-    }
-
-    return true
+  const addBatchTag = () => {
+    const v = batchInput.trim().toUpperCase()
+    if (!v) return
+    setBatchTags((prev) => (prev.includes(v) ? prev : [...prev, v]))
+    setBatchInput('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) return
-
-    const newItem: LinenItem = {
-      tagId: formData.tagId.toUpperCase(),
-      type: formData.type,
-      customerId: formData.customerId,
-      status: formData.status,
-      washCycles: formData.washCycles
-    }
-
-    setAddedItems(prev => [...prev, newItem])
-    setAlert({ type: 'success', message: `Item ${newItem.tagId} successfully added to inventory` })
-
-    // Reset form
-    setFormData({
-      tagId: '',
-      type: '',
-      customerId: '',
-      status: 'In Stock',
-      washCycles: 0
-    })
-
-    // Clear alert after 3 seconds
-    setTimeout(() => setAlert(null), 3000)
+  const submitBatch = async () => {
+    const res = await register(batchTags)
+    // Clear the queue only if every tag was accepted; otherwise leave the
+    // failed ones visible so the operator can review/retry.
+    if (res && res.every((r) => r.result === 'applied')) setBatchTags([])
   }
 
-  const getStatusColor = (status: LinenItem['status']) => {
-    switch (status) {
-      case 'In Stock':
-        return "bg-chart-3/20 text-chart-3 border-chart-3/30"
-      case 'Washing':
-        return "bg-chart-2/20 text-chart-2 border-chart-2/30"
-      case 'On-Rent':
-        return "bg-chart-4/20 text-chart-4 border-chart-4/30"
-      default:
-        return "bg-muted/20 text-muted-foreground border-muted/30"
-    }
-  }
+  const appliedCount = results.filter((r) => r.result === 'applied').length
+  const rejectedCount = results.filter((r) => r.result === 'rejected').length
 
-  const getCustomerName = (customerId: string) => {
-    return customers.find(c => c.id === customerId)?.name || 'Unknown'
+  if (!hasPermission('create')) {
+    return (
+      <div className="min-h-screen p-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{t('noPermission')}</AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Add Linen Item</h1>
-        <p className="mt-2 text-muted-foreground">Manually register new linen items to the inventory</p>
+        <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
+        <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
       </div>
 
+      {/* No articles yet → guide to create one first */}
+      {!loadingArticles && articles.length === 0 && (
+        <Alert className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {t('noArticles')}{' '}
+            <Link href="/inventory/articles" className="font-medium text-primary underline">
+              {t('goToArticles')}
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-2">
-        {/* Add Item Form */}
-        <Card className="border-border bg-card">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
+            <CardTitle className="flex items-center gap-2 text-xl">
               <Package className="h-5 w-5" />
-              Item Details
+              {t('itemContext')}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Tag ID */}
-              <div className="space-y-2">
-                <Label htmlFor="tagId" className="text-sm font-medium text-foreground">
-                  Tag ID *
-                </Label>
-                <Input
-                  id="tagId"
-                  placeholder="Enter unique tag ID (e.g., LN010)"
-                  value={formData.tagId}
-                  onChange={(e) => handleInputChange('tagId', e.target.value.toUpperCase())}
-                  className="font-mono"
-                  required
-                />
-              </div>
+          <CardContent className="space-y-6">
+            {/* Article picker (shared by both modes) */}
+            <div className="space-y-2">
+              <Label>{t('article')} *</Label>
+              <Select value={articleId} onValueChange={setArticleId} disabled={loadingArticles || articles.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingArticles ? t('loading') : t('selectArticle')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {articles.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      <span className="font-mono">{a.code}</span> — {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              {/* Linen Type */}
-              <div className="space-y-2">
-                <Label htmlFor="type" className="text-sm font-medium text-foreground">
-                  Linen Type *
-                </Label>
-                <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select linen type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {linenTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Ownership (defaults from article, editable) */}
+            <div className="space-y-2">
+              <Label>{t('ownership')}</Label>
+              <Select value={ownership} onValueChange={(v) => setOwnership(v as LinenOwnership)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {OWNERSHIPS.map((o) => (
+                    <SelectItem key={o} value={o}>{t(`ownershipLabels.${o}`)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{t('ownershipHint')}</p>
+            </div>
 
-              {/* Customer */}
-              <div className="space-y-2">
-                <Label htmlFor="customer" className="text-sm font-medium text-foreground">
-                  Assigned Customer *
-                </Label>
-                <Select value={formData.customerId} onValueChange={(value) => handleInputChange('customerId', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Single / Batch */}
+            <Tabs defaultValue="single">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">{t('single')}</TabsTrigger>
+                <TabsTrigger value="batch">{t('batch')}</TabsTrigger>
+              </TabsList>
 
-              {/* Status */}
-              <div className="space-y-2">
-                <Label htmlFor="status" className="text-sm font-medium text-foreground">
-                  Initial Status
-                </Label>
-                <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value as LinenItem['status'])}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="In Stock">In Stock</SelectItem>
-                    <SelectItem value="Washing">Washing</SelectItem>
-                    <SelectItem value="On-Rent">On-Rent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Single */}
+              <TabsContent value="single" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>{t('tagId')} *</Label>
+                  <Input
+                    className="font-mono"
+                    placeholder="LN0001"
+                    value={singleTag}
+                    onChange={(e) => setSingleTag(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitSingle() } }}
+                  />
+                </div>
+                <Button className="w-full" size="lg" onClick={submitSingle} disabled={submitting || !articleId}>
+                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                  {t('registerOne')}
+                </Button>
+              </TabsContent>
 
-              {/* Wash Cycles */}
-              <div className="space-y-2">
-                <Label htmlFor="washCycles" className="text-sm font-medium text-foreground">
-                  Initial Wash Cycles
-                </Label>
-                <Input
-                  id="washCycles"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={formData.washCycles}
-                  onChange={(e) => handleInputChange('washCycles', parseInt(e.target.value) || 0)}
-                />
-              </div>
+              {/* Batch */}
+              <TabsContent value="batch" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>{t('scanTag')}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      className="font-mono"
+                      placeholder="LN0001"
+                      value={batchInput}
+                      onChange={(e) => setBatchInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBatchTag() } }}
+                    />
+                    <Button variant="outline" onClick={addBatchTag} title={t('addTag')}>
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('batchHint')}</p>
+                </div>
 
-              {alert && (
-                <Alert className={`${alert.type === 'success' ? 'border-chart-3 bg-chart-3/10' : 'border-destructive bg-destructive/10'}`}>
-                  {alert.type === 'success' ? (
-                    <CheckCircle className="h-4 w-4 text-chart-3" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                  )}
-                  <AlertDescription className={alert.type === 'success' ? 'text-chart-3' : 'text-destructive'}>
-                    {alert.message}
-                  </AlertDescription>
-                </Alert>
-              )}
+                {batchTags.length > 0 && (
+                  <div className="rounded-lg border border-border p-3">
+                    <div className="mb-2 text-sm text-muted-foreground">
+                      {t('queued', { count: batchTags.length })}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {batchTags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="gap-1 font-mono">
+                          {tag}
+                          <button onClick={() => setBatchTags((p) => p.filter((x) => x !== tag))}>
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              <Button type="submit" className="w-full" size="lg">
-                <Save className="mr-2 h-4 w-4" />
-                Add to Inventory
-              </Button>
-            </form>
+                <Button className="w-full" size="lg" onClick={submitBatch}
+                  disabled={submitting || !articleId || batchTags.length === 0}>
+                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                  {t('registerBatch', { count: batchTags.length })}
+                </Button>
+              </TabsContent>
+            </Tabs>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
 
-        {/* Recently Added Items */}
-        <Card className="border-border bg-card">
+        {/* Results */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">
-              Recently Added ({addedItems.length})
+            <CardTitle className="text-xl">
+              {t('results')}
+              {results.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {t('resultSummary', { applied: appliedCount, rejected: rejectedCount })}
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {addedItems.length > 0 ? (
-              <div className="space-y-4">
-                {addedItems.slice(-5).reverse().map((item, index) => (
-                  <div key={`${item.tagId}-${index}`} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-sm font-medium text-foreground">{item.tagId}</span>
-                        <Badge variant="outline" className={getStatusColor(item.status)}>
-                          {item.status}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.type} • {getCustomerName(item.customerId)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.washCycles} wash cycles
-                      </div>
+            {results.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">{t('noResults')}</div>
+            ) : (
+              <div className="space-y-2">
+                {results.map((r) => (
+                  <div key={r.clientUuid} className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-2">
+                      {r.result === 'applied'
+                        ? <CheckCircle className="h-4 w-4 text-chart-3" />
+                        : <AlertCircle className="h-4 w-4 text-destructive" />}
+                      <span className="font-mono text-sm font-medium">{r.tagId}</span>
                     </div>
-                    <CheckCircle className="h-5 w-5 text-chart-3" />
+                    <div className="text-right">
+                      <Badge variant={r.result === 'applied' ? 'default' : 'destructive'}>
+                        {t(`status.${r.result}`)}
+                      </Badge>
+                      {r.reason && <div className="mt-1 text-xs text-muted-foreground">{r.reason}</div>}
+                    </div>
                   </div>
                 ))}
-                {addedItems.length > 5 && (
-                  <div className="text-center text-sm text-muted-foreground">
-                    ... and {addedItems.length - 5} more items
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No items added yet. Fill out the form to add your first item.
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Summary Stats */}
-      {addedItems.length > 0 && (
-        <div className="mt-8 grid gap-4 md:grid-cols-4">
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">{addedItems.length}</div>
-                <div className="text-sm text-muted-foreground">Total Items</div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">
-                  {new Set(addedItems.map(item => item.type)).size}
-                </div>
-                <div className="text-sm text-muted-foreground">Unique Types</div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">
-                  {new Set(addedItems.map(item => item.customerId)).size}
-                </div>
-                <div className="text-sm text-muted-foreground">Customers</div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-foreground">
-                  {addedItems.filter(item => item.status === 'In Stock').length}
-                </div>
-                <div className="text-sm text-muted-foreground">In Stock</div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }

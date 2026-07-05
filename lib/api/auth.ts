@@ -29,3 +29,18 @@ export async function loginRequest(
 export async function getMeRequest(): Promise<User> {
   return apiFetch<User>('/auth/me', { method: 'GET' })
 }
+
+/**
+ * POST /v1/auth/change-password — change the logged-in user's password.
+ * The backend revokes all refresh tokens on success, so the caller should
+ * force a re-login afterwards.
+ */
+export async function changePasswordRequest(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>('/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
+  })
+}

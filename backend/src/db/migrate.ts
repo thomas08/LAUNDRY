@@ -28,18 +28,37 @@ async function runMigration() {
       }
     }
 
-    // 3. Set the default admin password (schema.sql seeds a placeholder hash).
-    const hashedPassword = await bcrypt.hash('Admin123!', 10);
-    await client.query(
-      `UPDATE users SET password_hash = $1 WHERE id = 'user-superadmin'`,
-      [hashedPassword]
+    // 3. Seed the superadmin password — but ONLY while it is still the schema.sql
+    //    placeholder. This runs on every container start, so unconditionally
+    //    resetting it would clobber a password the operator later changed.
+    //    In production set SEED_ADMIN_PASSWORD so the first seed is a strong,
+    //    non-public value instead of the well-known 'Admin123!' default.
+    const PLACEHOLDER_HASH = '$2a$10$YourHashedPasswordHere';
+    const { rows: adminRows } = await client.query(
+      `SELECT password_hash FROM users WHERE id = 'user-superadmin'`
     );
+    const currentHash = adminRows[0]?.password_hash;
 
     console.log('✅ Database migrations completed successfully!');
-    console.log('\n📝 Default Credentials:');
-    console.log('   Email:    admin@linenflow.com');
-    console.log('   Password: Admin123!');
-    console.log('\n⚠️  Please change the default password after first login!\n');
+
+    if (!currentHash || currentHash === PLACEHOLDER_HASH) {
+      const seedPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
+      const hashedPassword = await bcrypt.hash(seedPassword, 10);
+      await client.query(
+        `UPDATE users SET password_hash = $1 WHERE id = 'user-superadmin'`,
+        [hashedPassword]
+      );
+      console.log('\n📝 Superadmin seeded:');
+      console.log('   Email:    admin@linenflow.com');
+      if (process.env.SEED_ADMIN_PASSWORD) {
+        console.log('   Password: (from SEED_ADMIN_PASSWORD)');
+      } else {
+        console.log('   Password: Admin123!  ⚠️  DEFAULT — change it, and set SEED_ADMIN_PASSWORD in production!');
+      }
+      console.log();
+    } else {
+      console.log('\n🔒 Superadmin password already set — leaving it unchanged.\n');
+    }
   } catch (error) {
     console.error('❌ Migration failed:', error);
     throw error;

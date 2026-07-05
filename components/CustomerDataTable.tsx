@@ -37,13 +37,15 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Search, ChevronLeft, ChevronRight, Filter, Eye, Edit, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import { Link } from '@/lib/navigation'
 
 interface CustomerDataTableProps {
   customers: Customer[]
+  onEdit?: (customer: Customer) => void
+  onDelete?: (customer: Customer) => void
 }
 
-export function CustomerDataTable({ customers }: CustomerDataTableProps) {
+export function CustomerDataTable({ customers, onEdit, onDelete }: CustomerDataTableProps) {
   const t = useTranslations('customers')
   const { user, hasPermission } = useAuth()
   const { currentBranch, availableBranches } = useBranch()
@@ -212,14 +214,14 @@ export function CustomerDataTable({ customers }: CustomerDataTableProps) {
 
                       {/* Edit Button - Only for users with 'update' permission */}
                       {hasPermission('update') && (
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => onEdit?.(customer)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                       )}
 
                       {/* Delete Button - Only for users with 'delete' permission */}
                       {hasPermission('delete') && (
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => onDelete?.(customer)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       )}

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/RBAC via `/v1/auth/*`); the business **data pages still render from mock data** because the backend has no data endpoints yet (only auth + RFID sync are implemented).
+This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/change-password/RBAC via `/v1/auth/*`). **Linen Articles, Customers, Inventory list, linen registration, and account/password** are also backend-wired (`/v1/articles`, `/v1/customers`, `/v1/linen-items`, `/v1/sync/batch`). The remaining business **data pages (Job Orders, Finance, consumable Stock, Suppliers, Reports) still render from mock data** pending their backend endpoints.
 
 ## Development Commands
 
@@ -53,6 +53,56 @@ LinenFlow™ is a Next.js 15 laundry management system with comprehensive RBAC (
 - Sonner for toast notifications
 - date-fns for date handling
 - Recharts for data visualization
+
+## Business Domain (Real-World Model)
+
+LinenFlow's customer is a **commercial laundry** that services hotels, hospitals, tourist-area
+shops, and walk-in individuals. The domain follows standard industrial-laundry / RFID textile-rental
+practice. This section is the **product target**; not all of it is built yet (see status flags).
+
+**Two data levels (foundation laid — DB + types exist, no CRUD/UI yet):**
+- **Article / SKU (linen type master)** — the reusable definition: e.g. "Bath Towel 70×140 White",
+  "King Bed Sheet". Holds category, size, color, weight, price, par level. **Modeled** as
+  `LinenArticle` in `lib/types.ts` and the `linen_articles` table (backend migration 003). `LinenItem`
+  now has an optional `articleId` link; the legacy free-text `LinenItem.type` stays until pages migrate.
+  No article CRUD endpoint or picker UI exists yet.
+- **Item (one physical RFID tag)** — one row per tag (`linen_items` / `LinenItem`), carries
+  `tagId`, `status`, `washCycles`, `version`, and links to an Article + owner.
+
+**Ownership model (key distinction — planned field `ownershipType`):**
+- **Rental pool** — linen owned by the laundry, rented out, billed per rental cycle; a customer is
+  attached only while `On-Rent`.
+- **Customer-Owned Goods (COG)** — linen owned by the hotel/hospital; the laundry only washes and
+  returns it (billed per wash), permanently tied to that customer, and must never enter the rental pool.
+- **Modeled**: `LinenOwnership = 'rental' | 'customer_owned'`, exposed as optional `LinenItem.ownershipType`
+  in `lib/types.ts` and as the `ownership` column on `linen_items` (default `'rental'`, migration 003).
+  The sync `item_receive` path reads `payload.ownership`/`payload.articleId`. Make `ownershipType`
+  required once mock pages are migrated.
+
+**Registration modes (the "add linen" flows):**
+- **Individual** — scan one tag → pick Article → save. Maps to the current `add-item` page and to a
+  single `item_receive` scan event. Good for replacements/exceptions.
+- **Batch / bulk commissioning** — pick Article + owner **once**, then rapid-scan many tags; each read
+  auto-creates an Item under that context. Maps to **many `item_receive` events in one
+  `POST /v1/sync/batch`** — the backend sync pipeline already supports this (idempotent via `clientUuid`).
+
+**Intake workflows:**
+- **On-site / route pickup** — staff visit the hotel/hospital and scan to create a collection tied to
+  customer + branch; must work **offline** (matches the existing sync/batch design).
+- **Walk-in counter** — customer brings linen to the shop; intake is created at the counter.
+
+**MVP constraint — single scanner:** the first rollout uses **one** RFID reader for a trial. UI must be
+as simple as possible while effective: a **mode-first** screen ("What are you doing?" → Register / Pick
+up / Dispatch-return / Stock check) that drops the operator straight into a scan-driven view, minimizing
+typing. Keep primary actions to 3–4.
+
+**Where this lives in code today:** `add-item` (individual registration), `checkin` (intake/return of
+on-rent items), and the backend `sync` module (`item_receive` = the registration primitive). All
+frontend pages are still mock data; the backend now has `linen_items` + `scan_events` +
+`linen_articles` (migration 003), but still **no** customer or job-order tables, and **no** REST
+endpoints for articles/inventory (only the sync pipeline writes items). Note: mock data in `inventory`
+and `checkin` uses inconsistent status casing (`on_rent`/`in_stock`/`washing`) vs the canonical
+`LinenItemStatus` (`'On-Rent'`/`'In Stock'`/`'Washing'`) — reconcile when wiring real data.
 
 ## Project Structure
 
@@ -350,7 +400,11 @@ Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refr
 
 **Implemented endpoints:**
 - `POST /v1/auth/login`, `POST /v1/auth/refresh`, `GET /v1/auth/me`
-- `POST /v1/sync/batch` — handheld RFID devices upload a batch of offline-collected scan events
+- `POST /v1/auth/change-password` — change own password (auth required; revokes all refresh tokens on success)
+- `GET/POST /v1/articles`, `GET/PUT/DELETE /v1/articles/:id` — Linen Article (SKU master) CRUD (`ArticleModel`); DELETE is a soft-delete (`is_active=false`). RBAC: read/create/update/delete.
+- `GET/POST /v1/customers`, `GET/PUT/DELETE /v1/customers/:id` — Customer CRUD (`CustomerModel`, migration 004). Branch-scoped in the controller via `utils/branchScope.ts` (superadmin=all, admin=`branchIds`, user=primary). Soft-delete.
+- `GET /v1/linen-items?status=&ownership=` — read-only linen inventory list (`LinenItemModel`), branch-scoped, LEFT JOINs `linen_articles` (articleName) + `customers` (customerName). Items are written only via the sync pipeline.
+- `POST /v1/sync/batch` — handheld RFID devices upload a batch of offline-collected scan events. Registration (single or batch) is `item_receive` events here; `payload.articleId`/`payload.ownership` link the item to an Article and set rental/COG.
 - `GET /v1/sync/reference?branchId=...` — reference data for devices to cache for offline use
 
 **RBAC parity**: `backend/src/middleware/rbac.ts` mirrors the frontend role-permission matrix from `lib/auth.ts`. When you change permissions on one side, change both. **The backend is the real enforcement point** — frontend RBAC is UI-only.
@@ -367,10 +421,25 @@ real login page, JWT + refresh-token storage, silent token refresh on 401, `/me`
 session restore, client-side route guard, and logout. Set `NEXT_PUBLIC_API_URL`
 (see `.env.example`) to point the frontend at the API.
 
-### Not done — Business data endpoints
-Customers, Inventory, Job Orders, Finance pages still read mock data. The backend
-has **no endpoints** for these yet, so integrating them requires building the backend
-modules first (routes → controllers → models, mirroring `auth`/`sync`).
+### Done — Linen Articles + Registration
+Real, backend-wired: the **Linen Types** page (`/inventory/articles`, `lib/api/articles.ts`)
+does full Article CRUD, and the **Register Linen** page (`/add-item`, `lib/api/sync.ts`)
+registers RFID linen single or batch by posting `item_receive` events to `/sync/batch`.
+The **Account** page (`/account`, `lib/api/auth.ts` `changePasswordRequest`) changes the
+password and forces re-login. These pages use plain `useEffect` fetch + inline `Alert`
+feedback (no SWR/react-query; `<Toaster/>` is not mounted).
+
+### Done — Customers + Inventory list
+Real, backend-wired: the **Customers** page (`/customers` + `/customers/[id]`, `lib/api/customers.ts`)
+does full CRUD via a dialog + `CustomerDataTable`; the detail page fetches by id (job-order history is
+a placeholder pending the operations backend). The **Inventory** page (`/inventory`,
+`lib/api/linen-items.ts`) is a real read-only list with status/ownership filters and canonical
+statuses (`In Stock`/`Washing`/`On-Rent`). Branch scoping is enforced server-side.
+
+### Not done — Remaining business data endpoints
+Job Orders, Finance (expenses/invoices), consumable Stock, Suppliers, and Reports pages still read
+mock data. The backend has **no endpoints** for these yet — build the modules first (routes →
+controllers → models, mirroring `auth`/`sync`/`articles`/`customers`).
 
 ### Integration Pattern (for the data modules, when built)
 
@@ -430,12 +499,15 @@ Currently no test framework is configured. Consider adding:
 
 ## Git Workflow
 
-**Current Branch**: `main`
+**Current Branch**: `phase-i-deployment`
 
-**Recent Commits** (Phased Development):
-- Phase D: Inventory, Operations & Finance Management System
-- Phase C: Enhanced Customers Page with Search, Filter & Pagination
-- Phase B: Create comprehensive API Contract (OpenAPI 3.0)
-- Phase A: Implement RBAC & Multi-Tenancy Architecture
+**Recent Commits** (Phased Development, newest first):
+- Integrate frontend auth with backend API (login/refresh/me/guard fully wired)
+- Phase I: RFID Sync API + production deployment setup (`docker-compose.prod.yml`, Dockerfiles)
+- Phase H: Complete Backend API with Authentication & RBAC (`backend/` service)
+- Phase G.2: Complete i18n for Check-in & Suppliers pages
+- Phase G.1: Linen Inventory complete upgrade
+- Phases A–D (earlier): RBAC & multi-tenancy, OpenAPI contract, Customers, Inventory/Operations/Finance
 
-**Untracked**: `app/[locale]/inventory/suppliers/` (new feature in development)
+The `inventory/suppliers/` page is now committed (Phase G.2). Remaining big gap: **business
+data endpoints** (Customers/Inventory/Job Orders/Finance) — frontend still on mock data.

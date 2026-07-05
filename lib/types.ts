@@ -63,21 +63,102 @@ export interface RolePermissions {
 // Business Entity Types
 // ============================================
 
+/**
+ * Customer segment. Drives billing model and reporting.
+ * Keep in sync with the backend `customer_type` enum (migration 004).
+ */
+export type CustomerType =
+  | 'hotel'      // โรงแรม
+  | 'hospital'   // โรงพยาบาล
+  | 'resort'     // รีสอร์ท
+  | 'restaurant' // ร้านอาหาร
+  | 'individual' // ลูกค้าทั่วไป / รับหน้าร้าน
+  | 'other'      // อื่นๆ
+
 export interface Customer {
   id: string
   name: string
   contactPerson: string
   email: string
   phone: string
+  address?: string
   branchId: string // Multi-tenancy: Customer belongs to a branch
+  customerType?: CustomerType
+  taxId?: string
+  creditLimit?: number
+  currentBalance?: number
+  paymentTerms?: number // days
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+/**
+ * Linen category — the kind of textile. Used to group/filter articles.
+ * Keep in sync with the backend `linen_category` enum (migration 003).
+ */
+export type LinenCategory =
+  | 'bed_sheet'   // ผ้าปูที่นอน
+  | 'pillow_case' // ปลอกหมอน
+  | 'towel'       // ผ้าเช็ดตัว/ผ้าขนหนู
+  | 'bath_towel'  // ผ้าเช็ดตัวใหญ่
+  | 'tablecloth'  // ผ้าปูโต๊ะ
+  | 'napkin'      // ผ้าเช็ดปาก
+  | 'uniform'     // ชุดยูนิฟอร์ม
+  | 'apron'       // ผ้ากันเปื้อน
+  | 'curtain'     // ผ้าม่าน
+  | 'blanket'     // ผ้าห่ม
+  | 'other'       // อื่นๆ
+
+/**
+ * Ownership model — the core rental-vs-wash-only distinction.
+ * - rental:         laundry-owned pool linen, rented out and billed per cycle
+ * - customer_owned: Customer-Owned Goods (COG) — hotel/hospital owns it, laundry
+ *                   only washes & returns; must never enter the rental pool.
+ * Keep in sync with the backend `linen_ownership` enum (migration 003).
+ */
+export type LinenOwnership = 'rental' | 'customer_owned'
+
+/**
+ * Canonical linen item status. Matches the backend `linen_item_status` enum and
+ * the sync `ALLOWED_TRANSITIONS` map (In Stock → Washing → On-Rent).
+ * NOTE: some mock pages still use snake_case ('in_stock'/'on_rent'/'washing') —
+ * those are legacy and should be migrated to these values when wired to real data.
+ */
+export type LinenItemStatus = 'In Stock' | 'Washing' | 'On-Rent'
+
+/**
+ * Article / SKU master — the reusable definition of a linen product type.
+ * One Article has many physical Items (LinenItem). This is what makes
+ * categorization easy: operators pick an Article instead of free-typing `type`.
+ */
+export interface LinenArticle {
+  id: string
+  code: string                 // รหัสสินค้า เช่น "BST-70140-WHT"
+  name: string                 // ชื่อที่แสดง
+  nameEn?: string
+  nameTh?: string
+  category: LinenCategory
+  size?: string                // เช่น "70x140", "King"
+  color?: string
+  weightGrams?: number         // น้ำหนักต่อชิ้น (ใช้คิดค่าซักแบบชั่งน้ำหนัก)
+  defaultOwnership: LinenOwnership // ค่าเริ่มต้นตอนลงทะเบียน item ใต้ article นี้
+  unitPrice?: number           // ราคาเช่า/ซักต่อรอบ (บาท)
+  parLevel?: number            // ระดับสต็อกที่ควรมี (สำหรับ rental pool)
+  branchId?: string            // ถ้า null = ใช้ได้ทุกสาขา
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface LinenItem {
   tagId: string
-  type: string
+  type: string                 // legacy free-text; ค่อยแทนที่ด้วย articleId
+  articleId?: string           // FK -> LinenArticle (โมเดลใหม่)
+  ownershipType?: LinenOwnership // rental vs COG — @todo make required once mocks migrated
   customerId: string
   branchId: string // Multi-tenancy: Item belongs to a branch
-  status: 'In Stock' | 'Washing' | 'On-Rent'
+  status: LinenItemStatus
   washCycles: number
 }
 

@@ -1,480 +1,216 @@
 'use client'
 
-import { useState, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { useAuth, useUser } from '@/contexts/AuthContext'
+import { useUser } from '@/contexts/AuthContext'
 import { useBranch } from '@/contexts/BranchContext'
-import { filterByBranchAccess } from '@/lib/auth'
-import { LinenItem } from "@/lib/types"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Search, Package, TrendingUp, AlertCircle, Plus, Edit, Trash2, Eye } from "lucide-react"
+import type { LinenItemStatus, LinenOwnership } from '@/lib/types'
+import { fetchLinenItems, type LinenItemRow } from '@/lib/api/linen-items'
+import { ApiError } from '@/lib/api/client'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Search, Package, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 
-// Mock linen inventory data with branches
-const mockLinenItems: (LinenItem & { branchId: string; customerName?: string })[] = [
-  // Bangkok Central (branch-1)
-  {
-    id: "linen-001",
-    tagId: "LN001",
-    type: "bed_sheet",
-    customerId: "cust-001",
-    customerName: "Riverside Hotel Bangkok",
-    status: "in_stock",
-    washCycles: 12,
-    branchId: "branch-1",
-    createdAt: "2023-06-15T10:00:00Z"
-  },
-  {
-    id: "linen-002",
-    tagId: "LN002",
-    type: "towel",
-    customerId: "cust-002",
-    customerName: "Grand Palace Hotel",
-    status: "on_rent",
-    washCycles: 8,
-    branchId: "branch-1",
-    createdAt: "2023-07-20T11:30:00Z"
-  },
-  {
-    id: "linen-003",
-    tagId: "LN003",
-    type: "tablecloth",
-    customerId: "cust-003",
-    customerName: "Bangkok Suites",
-    status: "washing",
-    washCycles: 15,
-    branchId: "branch-1",
-    createdAt: "2023-08-10T09:15:00Z"
-  },
-  {
-    id: "linen-004",
-    tagId: "LN004",
-    type: "bed_sheet",
-    customerId: "cust-001",
-    customerName: "Riverside Hotel Bangkok",
-    status: "in_stock",
-    washCycles: 5,
-    branchId: "branch-1",
-    createdAt: "2023-09-05T14:00:00Z"
-  },
-  {
-    id: "linen-005",
-    tagId: "LN005",
-    type: "pillow_case",
-    customerId: "cust-004",
-    customerName: "Silom Business Hotel",
-    status: "on_rent",
-    washCycles: 22,
-    branchId: "branch-1",
-    createdAt: "2023-10-12T16:20:00Z"
-  },
-  {
-    id: "linen-006",
-    tagId: "LN006",
-    type: "towel",
-    customerId: "cust-002",
-    customerName: "Grand Palace Hotel",
-    status: "in_stock",
-    washCycles: 18,
-    branchId: "branch-1",
-    createdAt: "2023-11-08T10:45:00Z"
-  },
+const STATUSES: LinenItemStatus[] = ['In Stock', 'Washing', 'On-Rent']
+const OWNERSHIPS: LinenOwnership[] = ['rental', 'customer_owned']
 
-  // Chiang Mai (branch-2)
-  {
-    id: "linen-007",
-    tagId: "LN007",
-    type: "uniform",
-    customerId: "cust-006",
-    customerName: "Nimman Heritage Hotel",
-    status: "washing",
-    washCycles: 9,
-    branchId: "branch-2",
-    createdAt: "2023-07-18T13:00:00Z"
-  },
-  {
-    id: "linen-008",
-    tagId: "LN008",
-    type: "tablecloth",
-    customerId: "cust-007",
-    customerName: "Old City Resort",
-    status: "in_stock",
-    washCycles: 7,
-    branchId: "branch-2",
-    createdAt: "2023-08-25T15:30:00Z"
-  },
-  {
-    id: "linen-009",
-    tagId: "LN009",
-    type: "bed_sheet",
-    customerId: "cust-008",
-    customerName: "Ping River View Hotel",
-    status: "on_rent",
-    washCycles: 14,
-    branchId: "branch-2",
-    createdAt: "2023-09-30T11:00:00Z"
-  },
-  {
-    id: "linen-010",
-    tagId: "LN010",
-    type: "towel",
-    customerId: "cust-009",
-    customerName: "Mountain Spa Resort",
-    status: "in_stock",
-    washCycles: 11,
-    branchId: "branch-2",
-    createdAt: "2023-10-20T09:30:00Z"
-  },
-
-  // Phuket (branch-3)
-  {
-    id: "linen-011",
-    tagId: "LN011",
-    type: "bed_sheet",
-    customerId: "cust-011",
-    customerName: "Patong Beach Resort",
-    status: "on_rent",
-    washCycles: 20,
-    branchId: "branch-3",
-    createdAt: "2023-06-28T14:15:00Z"
-  },
-  {
-    id: "linen-012",
-    tagId: "LN012",
-    type: "towel",
-    customerId: "cust-012",
-    customerName: "Kata View Hotel",
-    status: "washing",
-    washCycles: 16,
-    branchId: "branch-3",
-    createdAt: "2023-07-15T12:00:00Z"
-  },
-  {
-    id: "linen-013",
-    tagId: "LN013",
-    type: "pillow_case",
-    customerId: "cust-013",
-    customerName: "Phuket Wellness Spa",
-    status: "in_stock",
-    washCycles: 6,
-    branchId: "branch-3",
-    createdAt: "2023-08-10T10:20:00Z"
-  },
-  {
-    id: "linen-014",
-    tagId: "LN014",
-    type: "uniform",
-    customerId: "cust-015",
-    customerName: "Island Fitness Center",
-    status: "on_rent",
-    washCycles: 13,
-    branchId: "branch-3",
-    createdAt: "2023-09-05T16:45:00Z"
-  }
-]
+function statusKey(s: LinenItemStatus): 'inStock' | 'washing' | 'onRent' {
+  return s === 'In Stock' ? 'inStock' : s === 'On-Rent' ? 'onRent' : 'washing'
+}
+function statusVariant(s: LinenItemStatus): 'default' | 'secondary' | 'outline' {
+  return s === 'In Stock' ? 'default' : s === 'Washing' ? 'secondary' : 'outline'
+}
 
 export default function InventoryPage() {
   const t = useTranslations('inventory')
-  const tCommon = useTranslations('common')
-  const { hasPermission } = useAuth()
+  const tc = useTranslations('common')
   const user = useUser()
-  const { currentBranch } = useBranch()
+  const { availableBranches } = useBranch()
 
-  const [searchTerm, setSearchTerm] = useState("")
+  const [items, setItems] = useState<LinenItemRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const [ownershipFilter, setOwnershipFilter] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const perPage = 10
 
-  // Filter items by branch access
-  const accessibleItems = useMemo(() => {
-    if (!user) return []
-    return filterByBranchAccess(user, mockLinenItems)
-  }, [user])
+  const load = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      setItems(await fetchLinenItems())
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : t('loadError'))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
 
-  // Apply search and status filters
-  const filteredItems = useMemo(() => {
-    return accessibleItems.filter((item) => {
-      const matchesSearch =
-        item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.tagId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.customerName && item.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
+  useEffect(() => { load() }, [load])
 
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
-
-      return matchesSearch && matchesStatus
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return items.filter((it) => {
+      const matchSearch = !q ||
+        it.tagId.toLowerCase().includes(q) ||
+        (it.articleName ?? it.type ?? '').toLowerCase().includes(q) ||
+        (it.customerName ?? '').toLowerCase().includes(q)
+      const matchStatus = statusFilter === 'all' || it.status === statusFilter
+      const matchOwnership = ownershipFilter === 'all' || it.ownership === ownershipFilter
+      return matchSearch && matchStatus && matchOwnership
     })
-  }, [accessibleItems, searchTerm, statusFilter])
+  }, [items, search, statusFilter, ownershipFilter])
 
-  // Calculate summary metrics
-  const summaryMetrics = useMemo(() => {
-    const total = filteredItems.length
-    const inStock = filteredItems.filter(item => item.status === 'in_stock').length
-    const onRent = filteredItems.filter(item => item.status === 'on_rent').length
-    const washing = filteredItems.filter(item => item.status === 'washing').length
-    const avgWashCycles = filteredItems.reduce((sum, item) => sum + item.washCycles, 0) / total || 0
+  const summary = useMemo(() => {
+    const total = filtered.length
+    const inStock = filtered.filter((i) => i.status === 'In Stock').length
+    const onRent = filtered.filter((i) => i.status === 'On-Rent').length
+    const washing = filtered.filter((i) => i.status === 'Washing').length
+    const avg = total ? filtered.reduce((s, i) => s + i.washCycles, 0) / total : 0
+    return { total, inStock, onRent, washing, avg }
+  }, [filtered])
 
-    return { total, inStock, onRent, washing, avgWashCycles }
-  }, [filteredItems])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const pageItems = filtered.slice((page - 1) * perPage, page * perPage)
 
-  // Pagination
-  const totalPages = Math.ceil(filteredItems.length / itemsPerPage)
-  const paginatedItems = filteredItems.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const branchCode = (id: string) =>
+    availableBranches.find((b) => b.id === id)?.code || id
 
-  // Status color mapping
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "outline" => {
-    switch (status) {
-      case 'in_stock':
-        return "default"
-      case 'washing':
-        return "secondary"
-      case 'on_rent':
-        return "outline"
-      default:
-        return "outline"
-    }
-  }
-
-  // Linen type translation helper
-  const getLinenTypeKey = (type: string) => {
-    const typeMap: Record<string, string> = {
-      'bed_sheet': 'bedSheet',
-      'pillow_case': 'pillowCase',
-      'duvet_cover': 'duvetCover',
-      'tablecloth': 'tablecloth',
-      'towel': 'towel',
-      'bathrobe': 'bathrobe',
-      'uniform': 'uniform',
-      'napkin': 'napkin',
-      'curtain': 'curtain'
-    }
-    return typeMap[type] || type
-  }
+  const resetPage = () => setPage(1)
 
   return (
     <div className="min-h-screen p-8">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
-          <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
-        </div>
-        {hasPermission('create') && (
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            {tCommon('add')} {t('item')}
-          </Button>
-        )}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
+        <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary */}
       <div className="mb-6 grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{tCommon('total')} {t('items')}</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summaryMetrics.total}</div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('all')} {t('items').toLowerCase()}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('status.inStock')}</CardTitle>
-            <Package className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{summaryMetrics.inStock}</div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('available')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('status.onRent')}</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{summaryMetrics.onRent}</div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('withCustomers')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{tCommon('average')} {t('washCycles')}</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {summaryMetrics.avgWashCycles.toFixed(1)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('cycles')}
-            </p>
-          </CardContent>
-        </Card>
+        <SummaryCard label={t('summary.total')} value={summary.total} icon={<Package className="h-4 w-4 text-muted-foreground" />} />
+        <SummaryCard label={t('summary.inStock')} value={summary.inStock} icon={<Package className="h-4 w-4 text-green-500" />} valueClass="text-green-600" />
+        <SummaryCard label={t('summary.onRent')} value={summary.onRent} icon={<TrendingUp className="h-4 w-4 text-blue-500" />} valueClass="text-blue-600" />
+        <SummaryCard label={t('summary.avgWashCycles')} value={summary.avg.toFixed(1)} icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />} />
       </div>
 
       {/* Filters */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{tCommon('filters')}</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>{tc('filters')}</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={tCommon('searchPlaceholder')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              <Input className="pl-9" placeholder={tc('searchPlaceholder')} value={search}
+                onChange={(e) => { setSearch(e.target.value); resetPage() }} />
             </div>
-
-            <div className="space-y-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{tCommon('all')} {tCommon('status')}</SelectItem>
-                  <SelectItem value="in_stock">{t('status.inStock')}</SelectItem>
-                  <SelectItem value="on_rent">{t('status.onRent')}</SelectItem>
-                  <SelectItem value="washing">{t('status.washing')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage() }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allStatus')}</SelectItem>
+                {STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>{t(`statusLabels.${statusKey(s)}`)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={ownershipFilter} onValueChange={(v) => { setOwnershipFilter(v); resetPage() }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allOwnership')}</SelectItem>
+                {OWNERSHIPS.map((o) => (
+                  <SelectItem key={o} value={o}>{t(`ownershipLabels.${o}`)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Inventory Table */}
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-foreground">
-            {t('inventoryItems')}
-          </CardTitle>
-        </CardHeader>
+      {loadError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Table */}
+      <Card>
+        <CardHeader><CardTitle className="text-xl">{t('inventoryItems')}</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">{t('tagId')}</TableHead>
-                  <TableHead className="text-muted-foreground">{tCommon('type')}</TableHead>
-                  <TableHead className="text-muted-foreground">{tCommon('customer')}</TableHead>
-                  <TableHead className="text-muted-foreground">{tCommon('status')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('washCycles')}</TableHead>
-                  {user?.role !== 'user' && <TableHead className="text-muted-foreground">{tCommon('branch')}</TableHead>}
-                  <TableHead className="text-right text-muted-foreground">{tCommon('actions')}</TableHead>
+                <TableRow>
+                  <TableHead>{t('tagId')}</TableHead>
+                  <TableHead>{t('article')}</TableHead>
+                  <TableHead>{tc('customer')}</TableHead>
+                  <TableHead>{tc('status')}</TableHead>
+                  <TableHead>{t('ownership')}</TableHead>
+                  <TableHead className="text-right">{t('washCycles')}</TableHead>
+                  {user?.role !== 'user' && <TableHead>{tc('branch')}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedItems.length > 0 ? (
-                  paginatedItems.map((item) => (
-                    <TableRow key={item.tagId} className="border-border hover:bg-accent/50">
-                      <TableCell className="font-mono text-sm font-medium text-foreground">
-                        {item.tagId}
-                      </TableCell>
-                      <TableCell className="text-foreground">
-                        <Badge variant="outline">
-                          {t(`types.${getLinenTypeKey(item.type)}` as any)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-xs truncate">
-                        {item.customerName || item.customerId}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(item.status)}>
-                          {t(`status.${item.status === 'in_stock' ? 'inStock' : item.status === 'on_rent' ? 'onRent' : item.status}` as any)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{item.washCycles}</TableCell>
-                      {user?.role !== 'user' && (
-                        <TableCell>
-                          <Badge variant="outline">
-                            {item.branchId === 'branch-1' ? 'BKK01' :
-                             item.branchId === 'branch-2' ? 'CNX01' : 'HKT01'}
-                          </Badge>
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {hasPermission('update') && (
-                            <Button variant="ghost" size="icon">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {hasPermission('delete') && (
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      {tCommon('noData')}
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                     </TableCell>
                   </TableRow>
+                ) : pageItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      {t('empty')}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  pageItems.map((it) => (
+                    <TableRow key={it.tagId}>
+                      <TableCell className="font-mono text-sm font-medium">{it.tagId}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{it.articleName ?? it.type}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate text-muted-foreground">
+                        {it.customerName ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusVariant(it.status)}>{t(`statusLabels.${statusKey(it.status)}`)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={it.ownership === 'rental' ? 'default' : 'secondary'}>
+                          {t(`ownershipLabels.${it.ownership}`)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">{it.washCycles}</TableCell>
+                      {user?.role !== 'user' && (
+                        <TableCell><Badge variant="outline">{branchCode(it.branchId)}</Badge></TableCell>
+                      )}
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
+          {filtered.length > perPage && (
+            <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {tCommon('showing')} {paginatedItems.length} {tCommon('of')} {filteredItems.length} {t('items').toLowerCase()}
+                {tc('showing')} {pageItems.length} {tc('of')} {filtered.length} {t('items')}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  {tCommon('previous')}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+                  {tc('previous')}
                 </Button>
-                <div className="flex items-center px-3 text-sm">
-                  {tCommon('page')} {currentPage} {tCommon('of')} {totalPages}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  {tCommon('next')}
+                <span className="px-2 text-sm">{tc('page')} {page} {tc('of')} {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                  {tc('next')}
                 </Button>
               </div>
             </div>
@@ -482,5 +218,19 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function SummaryCard({ label, value, icon, valueClass }: { label: string; value: React.ReactNode; icon: React.ReactNode; valueClass?: string }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{label}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold ${valueClass ?? ''}`}>{value}</div>
+      </CardContent>
+    </Card>
   )
 }

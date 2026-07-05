@@ -27,11 +27,17 @@ export const config = {
   },
 };
 
-// Validate required environment variables
-if (!process.env.JWT_SECRET && config.nodeEnv === 'production') {
-  throw new Error('JWT_SECRET must be defined in production');
-}
-
-if (!process.env.DATABASE_URL && config.nodeEnv === 'production') {
-  throw new Error('DATABASE_URL must be defined in production');
+// Validate required environment variables in production.
+// These MUST come from the environment — the in-code fallbacks above are
+// dev-only convenience and are public in the repo, so relying on them in
+// production would be an auth-bypass risk (forged tokens) / broken DB config.
+if (config.nodeEnv === 'production') {
+  const missing = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL'].filter(
+    (name) => !process.env[name]
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required production env var(s): ${missing.join(', ')}`
+    );
+  }
 }

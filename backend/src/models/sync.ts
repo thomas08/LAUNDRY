@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 
 export type ScanEventType = 'item_receive' | 'item_status_change' | 'job_order_link' | 'stock_check';
 export type LinenItemStatus = 'In Stock' | 'Washing' | 'On-Rent';
+export type LinenOwnership = 'rental' | 'customer_owned'; // rental = ผ้าเช่าของโรงซัก, customer_owned = COG ผ้าลูกค้าเอง
 export type SyncResultStatus = 'applied' | 'rejected';
 
 export interface ScanEventInput {
@@ -26,9 +27,11 @@ export interface SyncEventResult {
 export interface LinenItem {
   tagId: string;
   type: string;
+  articleId: string | null;        // FK -> linen_articles (แม่แบบประเภทผ้า)
   customerId: string | null;
   branchId: string;
   status: LinenItemStatus;
+  ownership: LinenOwnership;        // rental vs customer_owned (COG)
   washCycles: number;
   version: number;
   updatedAt: Date;
@@ -91,15 +94,19 @@ export class SyncModel {
 
     if (event.eventType === 'item_receive' && !existingItem) {
       // รับผ้าเข้าครั้งแรก: สร้าง linen_items ใหม่
+      // articleId/ownership มาจาก context ที่เครื่องตั้งไว้ตอนลงทะเบียน (แบบชิ้น/แบบกลุ่ม)
+      // ownership default = 'rental' ให้ตรงกับ DB ถ้าเครื่องไม่ส่งมา
       await client.query(
-        `INSERT INTO linen_items (tag_id, type, customer_id, branch_id, status, version)
-         VALUES ($1, $2, $3, $4, $5, 1)`,
+        `INSERT INTO linen_items (tag_id, type, article_id, customer_id, branch_id, status, ownership, version)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1)`,
         [
           event.tagId,
           event.payload?.type || 'unknown',
+          event.payload?.articleId || null,
           event.payload?.customerId || null,
           event.branchId,
           event.newStatus || 'In Stock',
+          event.payload?.ownership || 'rental',
         ]
       );
     } else if (existingItem) {

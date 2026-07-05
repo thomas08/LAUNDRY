@@ -170,6 +170,89 @@ export async function refresh(req: Request, res: Response): Promise<void> {
   }
 }
 
+// Change password controller (requires authentication)
+export async function changePassword(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'currentPassword and newPassword are required',
+        code: 'INVALID_INPUT',
+      });
+      return;
+    }
+
+    // นโยบายรหัสผ่านขั้นต่ำ (ปรับเพิ่มได้ภายหลัง)
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'New password must be at least 8 characters',
+        code: 'WEAK_PASSWORD',
+      });
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'New password must be different from the current password',
+        code: 'SAME_PASSWORD',
+      });
+      return;
+    }
+
+    // ดึง hash ปัจจุบันมาตรวจ (findByEmail คืน password_hash มาด้วย)
+    const userWithPassword = await UserModel.findByEmail(req.user.email);
+    if (!userWithPassword) {
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'User not found',
+        code: 'USER_NOT_FOUND',
+      });
+      return;
+    }
+
+    const isValid = await UserModel.verifyPassword(
+      currentPassword,
+      userWithPassword.password_hash
+    );
+    if (!isValid) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Current password is incorrect',
+        code: 'INVALID_CREDENTIALS',
+      });
+      return;
+    }
+
+    const newHash = await UserModel.hashPassword(newPassword);
+    await UserModel.updatePassword(req.user.id, newHash);
+
+    // 200 + แจ้งว่า refresh tokens ถูก revoke แล้ว (frontend ควรบังคับ login ใหม่)
+    res.status(200).json({
+      message: 'Password changed successfully. Please log in again.',
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to change password',
+      code: 'CHANGE_PASSWORD_ERROR',
+    });
+  }
+}
+
 // Get current user controller
 export async function getCurrentUser(req: AuthRequest, res: Response): Promise<void> {
   try {

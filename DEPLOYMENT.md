@@ -22,7 +22,9 @@ git clone <repo-url> linenflow && cd linenflow
 # 2. Create the production env file from the template and edit the secrets
 cp .env.prod.example .env.prod
 #   - set DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET (use: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
+#   - set SEED_ADMIN_PASSWORD to a strong value (first-run superadmin password; avoids the public default)
 #   - set CORS_ORIGIN and NEXT_PUBLIC_API_URL to your real public URLs
+# The backend refuses to start in production if JWT_SECRET, JWT_REFRESH_SECRET, or DATABASE_URL is missing.
 
 # 3. Build and start everything
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
@@ -35,7 +37,10 @@ curl http://localhost:8080/health
 - Backend listens on **:8080** (base path `/v1`), frontend on **:3000**.
 - The backend container **runs DB migrations on start automatically** (idempotent —
   safe on every restart). No manual migration step.
-- Default seeded login: `admin@linenflow.com` / `Admin123!` — **change it after first login.**
+- Seeded login: `admin@linenflow.com`. The password is `SEED_ADMIN_PASSWORD` on the
+  first migrate, or the public default `Admin123!` if you didn't set it — so **always set
+  `SEED_ADMIN_PASSWORD`**. The seed only applies while the password is unset; restarts never
+  clobber it. (There is no in-app password-change screen yet — see "Next step".)
 
 To update after a `git pull`:
 ```bash
@@ -97,7 +102,7 @@ If the API is served under the same domain at `/v1`, set
 - [ ] Strong `DB_PASSWORD`; Postgres port **not** published to the internet
 - [ ] `CORS_ORIGIN` set to the real frontend origin (not `*`, not localhost)
 - [ ] `NEXT_PUBLIC_API_URL` points at the public API URL
-- [ ] Changed the default `admin@linenflow.com` password
+- [ ] `SEED_ADMIN_PASSWORD` set to a strong value (so `admin@linenflow.com` is never `Admin123!`)
 - [ ] TLS terminated at the reverse proxy
 - [ ] Database volume backed up (`postgres_data`)
 
