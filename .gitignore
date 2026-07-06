@@ -31,3 +31,6 @@ backups/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# built APKs and the static download dir served by Caddy
+*.apk
+/public/
