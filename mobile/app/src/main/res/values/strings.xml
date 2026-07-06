@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LaundryKing Scanner</string>
+
+    <!-- Login -->
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_base_url">API base URL</string>
+    <string name="hint_branch">Branch ID</string>
+    <string name="hint_device">Device ID</string>
+    <string name="sign_in">Sign in</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="enter_credentials">Enter email and password</string>
+    <string name="login_failed">Login failed</string>
+
+    <!-- Main -->
+    <string name="mode">Mode</string>
+    <string name="hint_job_order">Job order id (Dispatch, optional)</string>
+    <string name="hint_register_type">Linen type (Register, optional)</string>
+    <string name="hint_tag">Scan or type tag (EPC)</string>
+    <string name="add">Add</string>
+    <string name="clear">Clear</string>
+    <string name="start_scan">Start scan</string>
+    <string name="stop_scan">Stop scan</string>
+    <string name="submit">Submit</string>
+    <string name="sync_ref">Sync reference</string>
+    <string name="logout">Logout</string>
+    <string name="reader_ready">Reader ready</string>
+    <string name="reader_unavailable">Reader unavailable — manual entry only</string>
+    <string name="no_tags">No tags yet. Scan or type a tag.</string>
+    <string name="tag_count">%1$d tag(s) queued</string>
+    <string name="uploading">Uploading…</string>
+    <string name="syncing_ref">Syncing reference…</string>
+    <string name="sync_failed">Sync failed</string>
+    <string name="result_summary">%1$d applied · %2$d rejected</string>
+    <string name="upload_failed">Upload failed (kept for retry): %1$s</string>
+    <string name="ref_summary">Cached: %1$s · %2$d customers · %3$d open orders</string>
+    <string name="pending_count">Pending in queue: %1$d</string>
+</resources>
