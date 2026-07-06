@@ -29,6 +29,13 @@
 		file_server browse
 	}
 
+	# User guide (served from ./public/guide/index.html)
+	@guide path /guide /guide/*
+	handle @guide {
+		root * /srv
+		file_server
+	}
+
 	# Everything else -> the Next.js frontend
 	handle {
 		reverse_proxy frontend:3000
