@@ -39,4 +39,13 @@
     <string name="result_reject">⚠️ %1$d rejected</string>
     <string name="upload_fail">Not sent — kept for retry</string>
     <string name="pending">Pending: %1$d</string>
+
+    <!-- Pickers (Register / Dispatch / Pickup) -->
+    <string name="select_article">Linen type</string>
+    <string name="select_customer">Customer</string>
+    <string name="select_joborder">Job order (optional)</string>
+    <string name="own_rental">Rental</string>
+    <string name="own_cog">Customer-owned</string>
+    <string name="opt_none">— none —</string>
+    <string name="no_ref">No list yet — go online once to load it</string>
 </resources>

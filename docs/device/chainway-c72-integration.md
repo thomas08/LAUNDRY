@@ -146,10 +146,12 @@ Returns data to cache for offline operation:
   "branch":   { "id": "branch-1", "code": "001", "name": "LaundryKing" },
   "customers":[ { "id": "...", "name": "...", "customerType": "hotel", "phone": "..." } ],
   "jobOrders":[ { "id": "...", "orderNumber": "JO-2026-0001", "customerId": "...", "status": "..." } ],
+  "articles": [ { "id": "...", "code": "BST-70140-WHT", "name": "Bath Towel", "nameEn": "...", "category": "..." } ],
   "syncedAt": "2026-07-06T06:00:00.000Z"
 }
 ```
 
+- `articles` = active linen SKUs (branch-specific + global) for the **Register** picker.
 - `customers` = active customers of the branch (for Pickup / choosing a COG owner).
 - `jobOrders` = **open** orders (not delivered/cancelled) for `job_order_link`.
 - Refresh on login and opportunistically when online; `syncedAt` lets the app show cache age.

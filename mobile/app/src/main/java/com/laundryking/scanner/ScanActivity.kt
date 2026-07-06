@@ -3,10 +3,13 @@ package com.laundryking.scanner
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.widget.ArrayAdapter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.laundryking.scanner.data.Mode
+import com.laundryking.scanner.data.Option
+import com.laundryking.scanner.data.RefCache
 import com.laundryking.scanner.data.ScanEvent
 import com.laundryking.scanner.data.ScanQueue
 import com.laundryking.scanner.databinding.ActivityScanBinding
@@ -29,6 +32,7 @@ class ScanActivity : AppCompatActivity() {
 
     private lateinit var mode: Mode
     private val tags = LinkedHashSet<String>()
+    private val refCache by lazy { RefCache(this) }
     private val triggerKeys = setOf(139, 280, 293, 294, 311, 312, 313, 315, 87, 88)
 
     private fun modeColor(m: Mode) = when (m) {
@@ -63,6 +67,8 @@ class ScanActivity : AppCompatActivity() {
         uhf.setOnTag { epc -> runOnUiThread { addTag(epc) } }
         if (!ready) b.hint.setText(R.string.reader_off)
 
+        setupPickers()
+
         b.btnBack.setOnClickListener { finish() }
         b.scanToggle.setOnClickListener { toggleScan() }
         b.addBtn.setOnClickListener {
@@ -73,6 +79,34 @@ class ScanActivity : AppCompatActivity() {
         b.saveBtn.setOnClickListener { save() }
 
         render(); updatePending()
+    }
+
+    /** Show only the pickers relevant to this mode, filled from the offline reference cache. */
+    private fun setupPickers() {
+        val none = Option("", getString(R.string.opt_none))
+        val articles = refCache.articles()
+        fun fill(sp: android.widget.Spinner, items: List<Option>) {
+            sp.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, items)
+        }
+        fill(b.spinnerArticle, articles)
+        fill(b.spinnerCustomer, listOf(none) + refCache.customers())
+        fill(b.spinnerJobOrder, listOf(none) + refCache.jobOrders())
+
+        fun show(vararg v: View) = v.forEach { it.visibility = View.VISIBLE }
+        when (mode) {
+            Mode.REGISTER -> {
+                show(b.labelArticle, b.spinnerArticle, b.ownershipGroup)
+                b.ownershipGroup.setOnCheckedChangeListener { _, id ->
+                    val cog = id == R.id.rbCog
+                    b.labelCustomer.visibility = if (cog) View.VISIBLE else View.GONE
+                    b.spinnerCustomer.visibility = if (cog) View.VISIBLE else View.GONE
+                }
+                if (articles.isEmpty()) b.hint.setText(R.string.no_ref)
+            }
+            Mode.DISPATCH -> show(b.labelJobOrder, b.spinnerJobOrder)
+            Mode.PICKUP -> show(b.labelCustomer, b.spinnerCustomer)
+            else -> {}
+        }
     }
 
     private fun addTag(epc: String) {
@@ -103,7 +137,20 @@ class ScanActivity : AppCompatActivity() {
     private fun save() {
         if (tags.isEmpty()) return
         val branchId = session.branchId
-        val events = tags.map { ScanEvent.forTag(mode, it, branchId) }
+        val article = b.spinnerArticle.selectedItem as? Option
+        val customer = b.spinnerCustomer.selectedItem as? Option
+        val jobOrder = b.spinnerJobOrder.selectedItem as? Option
+        val ownership = if (b.rbCog.isChecked) "customer_owned" else "rental"
+        val events = tags.map {
+            ScanEvent.forTag(
+                mode, it, branchId,
+                articleId = article?.id?.ifBlank { null },
+                articleName = article?.label,
+                ownership = ownership,
+                customerId = customer?.id?.ifBlank { null },
+                jobOrderId = jobOrder?.id?.ifBlank { null }
+            )
+        }
         events.forEach { queue.add(it) }
         updatePending()
         tags.clear(); render()

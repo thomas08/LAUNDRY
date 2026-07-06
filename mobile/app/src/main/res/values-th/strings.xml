@@ -39,4 +39,13 @@
     <string name="result_reject">⚠️ ไม่ผ่าน %1$d ชิ้น</string>
     <string name="upload_fail">ยังไม่ได้ส่ง เก็บไว้ลองใหม่</string>
     <string name="pending">รอส่ง %1$d</string>
+
+    <!-- Pickers (Register / Dispatch / Pickup) -->
+    <string name="select_article">ประเภทผ้า</string>
+    <string name="select_customer">ลูกค้า</string>
+    <string name="select_joborder">ใบสั่งงาน (ไม่บังคับ)</string>
+    <string name="own_rental">ผ้าเช่า</string>
+    <string name="own_cog">ผ้าลูกค้า (COG)</string>
+    <string name="opt_none">— ไม่ระบุ —</string>
+    <string name="no_ref">ยังไม่มีรายการ — ต่อเน็ตครั้งแรกเพื่อโหลด</string>
 </resources>

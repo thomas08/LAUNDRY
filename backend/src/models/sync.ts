@@ -190,10 +190,19 @@ export class SyncModel {
         ORDER BY created_at DESC`,
       [branchId]
     );
+    // Article/SKU master for the handheld Register flow (branch-specific + global).
+    const articles = await query(
+      `SELECT id, code, name, name_en AS "nameEn", category
+         FROM linen_articles
+        WHERE (branch_id = $1 OR branch_id IS NULL) AND is_active = true
+        ORDER BY name`,
+      [branchId]
+    );
     return {
       branch: branch[0] || null,
       customers,
       jobOrders,
+      articles,
       syncedAt: new Date().toISOString(),
     };
   }

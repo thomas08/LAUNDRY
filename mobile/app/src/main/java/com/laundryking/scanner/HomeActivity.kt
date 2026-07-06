@@ -3,9 +3,15 @@ package com.laundryking.scanner
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.laundryking.scanner.data.Mode
+import com.laundryking.scanner.data.RefCache
 import com.laundryking.scanner.databinding.ActivityHomeBinding
+import com.laundryking.scanner.net.Api
 import com.laundryking.scanner.net.Session
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Mode-first home: big buttons for floor staff. Pick a job → ScanActivity. */
 class HomeActivity : AppCompatActivity() {
@@ -31,6 +37,18 @@ class HomeActivity : AppCompatActivity() {
         b.btnLogout.setOnClickListener {
             session.clearAuth()
             startActivity(Intent(this, LoginActivity::class.java)); finish()
+        }
+
+        // Refresh the offline reference cache (articles/customers/job orders) for the pickers.
+        val api = Api(session)
+        val refCache = RefCache(this)
+        lifecycleScope.launch {
+            try {
+                val ref = withContext(Dispatchers.IO) { api.fetchReference() }
+                withContext(Dispatchers.IO) { refCache.save(ref) }
+            } catch (_: Exception) {
+                // Offline — keep whatever was cached last time.
+            }
         }
     }
 

@@ -65,19 +65,28 @@ data class ScanEvent(
             payload = o.optJSONObject("payload")
         )
 
-        /** Build one event for a scanned tag under the given mode. */
+        /** Build one event for a scanned tag under the given mode + its context. */
         fun forTag(
             mode: Mode,
             tagId: String,
             branchId: String,
-            jobOrderId: String? = null,
-            registerType: String? = null,
-            ownership: String = "rental"
+            articleId: String? = null,
+            articleName: String? = null,
+            ownership: String = "rental",
+            customerId: String? = null,
+            jobOrderId: String? = null
         ): ScanEvent {
-            val payload = if (mode == Mode.REGISTER) JSONObject().apply {
-                put("type", registerType ?: "unknown")
-                put("ownership", ownership)
-            } else null
+            val payload = when (mode) {
+                Mode.REGISTER -> JSONObject().apply {
+                    put("type", articleName ?: "unknown")
+                    if (articleId != null) put("articleId", articleId)
+                    put("ownership", ownership)
+                    if (ownership == "customer_owned" && customerId != null) put("customerId", customerId)
+                }
+                Mode.PICKUP -> if (customerId != null)
+                    JSONObject().apply { put("customerId", customerId) } else null
+                else -> null
+            }
             return ScanEvent(
                 clientUuid = UUID.randomUUID().toString(),
                 eventType = mode.eventType,

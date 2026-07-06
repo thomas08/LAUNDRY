@@ -12,7 +12,12 @@ import java.net.URL
 data class SyncResult(val clientUuid: String, val result: String, val reason: String?)
 
 /** Cached reference data for offline use. */
-data class Reference(val branchName: String?, val customers: JSONArray, val jobOrders: JSONArray)
+data class Reference(
+    val branchName: String?,
+    val customers: JSONArray,
+    val jobOrders: JSONArray,
+    val articles: JSONArray
+)
 
 /**
  * Minimal LinenFlow API client over HttpURLConnection + org.json (no extra deps).
@@ -52,7 +57,8 @@ class Api(private val session: Session) {
         return Reference(
             branchName = res.optJSONObject("branch")?.optString("name"),
             customers = res.optJSONArray("customers") ?: JSONArray(),
-            jobOrders = res.optJSONArray("jobOrders") ?: JSONArray()
+            jobOrders = res.optJSONArray("jobOrders") ?: JSONArray(),
+            articles = res.optJSONArray("articles") ?: JSONArray()
         )
     }
 
