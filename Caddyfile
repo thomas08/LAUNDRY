@@ -1,0 +1,37 @@
+# ── LinenFlow™ reverse proxy (TLS termination + routing) ────────────────────
+# Caddy is the only internet-facing service. It obtains + renews Let's Encrypt
+# certificates automatically for {$DOMAIN}. DOMAIN and ACME_EMAIL are supplied by
+# docker-compose.prod.yml from .env.prod.
+#
+#   /v1/*  and  /health   -> backend API   (container "backend" on :8080)
+#   everything else        -> Next.js app  (container "frontend" on :3000)
+#
+# Because the browser hits the API on the SAME origin (https://DOMAIN/v1), there
+# is no cross-origin request in normal use.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Backend API + health probe
+	@api path /v1/* /health
+	handle @api {
+		reverse_proxy backend:8080
+	}
+
+	# Everything else -> the Next.js frontend
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	# Basic hardening headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

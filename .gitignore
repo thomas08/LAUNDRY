@@ -22,6 +22,9 @@ yarn-error.log*
 !.env.example
 !.env.prod.example
 
+# database backups (produced by scripts/backup-db.sh — never commit dumps)
+backups/
+
 # vercel
 .vercel
 

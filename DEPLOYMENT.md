@@ -1,58 +1,130 @@
 # Deployment Guide — LinenFlow™
 
-This repo deploys as three containers: **PostgreSQL**, the **backend API** (`backend/`),
-and the **Next.js frontend** (root). The easiest path is the bundled
-`docker-compose.prod.yml`.
+This repo deploys as four containers behind a TLS reverse proxy:
+**Caddy** (HTTPS), the **Next.js frontend** (root), the **backend API** (`backend/`),
+and **PostgreSQL**. The bundled `docker-compose.prod.yml` wires them together;
+Caddy is the only service exposed to the internet.
 
-> **Status note:** the frontend's **authentication is integrated** with the backend
-> (real login/logout/refresh via `/v1/auth/*`). Business data pages (customers,
-> inventory, finance…) still render from mock data because the backend has no data
-> endpoints yet. Set `NEXT_PUBLIC_API_URL` so the browser can reach the API.
+> **Status:** the app is fully backend-wired — auth plus all business-data pages
+> (customers, inventory, job orders, finance, suppliers, stock, reports) read from
+> the real API. Only `checkin` and `ai-scanner` still use mock data.
 
 ---
 
-## Option A — Docker Compose (recommended)
+## Architecture
 
-Prerequisites on the server: Docker Engine + Docker Compose v2.
+```
+                 :443 / :80
+  Internet ──►  Caddy (TLS, Let's Encrypt)
+                  │  /v1/* , /health ─► backend:8080 ─► postgres:5432
+                  └  everything else ─► frontend:3000
+```
 
+- **Caddy** publishes `80` + `443`. Everything else is internal-only (backend and
+  frontend also bind `127.0.0.1:8080` / `127.0.0.1:3000` for on-box debugging).
+- The browser calls the API at the **same origin** (`https://DOMAIN/v1`), so there
+  is no cross-origin request in normal use.
+- The backend container **runs DB migrations on start** (idempotent — safe on every
+  restart). No manual migration step.
+
+---
+
+## Deploy on DigitalOcean (or any Ubuntu VPS)
+
+### 0. Provision
+- Create a Droplet: **Ubuntu 24.04, 2 vCPU / 4 GB RAM / 80 GB SSD**, region
+  **Singapore (SGP1)** for lowest latency to Thailand. (2 GB works only if you add
+  swap — the Next.js build is memory-hungry; see the swap step.)
+- Add your SSH key during creation. SSH in as a sudo user.
+- Point your domain's **DNS A record** at the Droplet's public IP and let it
+  propagate before step 5 (Let's Encrypt needs it resolving).
+
+### 1. Firewall — expose only 22 / 80 / 443
 ```bash
-# 1. Get the code onto the server
-git clone <repo-url> linenflow && cd linenflow
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+```
 
-# 2. Create the production env file from the template and edit the secrets
+### 2. (2 GB Droplets only) add swap so the frontend build doesn't OOM
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### 3. Install Docker Engine + Compose v2
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"   # then log out/in so the group applies
+```
+
+### 4. Get the code + configure secrets
+```bash
+sudo mkdir -p /opt/linenflow && sudo chown "$USER" /opt/linenflow
+git clone <repo-url> /opt/linenflow && cd /opt/linenflow
+
 cp .env.prod.example .env.prod
-#   - set DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET (use: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
-#   - set SEED_ADMIN_PASSWORD to a strong value (first-run superadmin password; avoids the public default)
-#   - set CORS_ORIGIN and NEXT_PUBLIC_API_URL to your real public URLs
-# The backend refuses to start in production if JWT_SECRET, JWT_REFRESH_SECRET, or DATABASE_URL is missing.
-
-# 3. Build and start everything
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-
-# 4. Check
-docker compose -f docker-compose.prod.yml ps
-curl http://localhost:8080/health
+# Edit .env.prod and set:
+#   DOMAIN, ACME_EMAIL
+#   DB_PASSWORD
+#   JWT_SECRET, JWT_REFRESH_SECRET   (node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
+#   SEED_ADMIN_PASSWORD              (strong — avoids the public 'Admin123!' default)
+#   CORS_ORIGIN=https://DOMAIN  and  NEXT_PUBLIC_API_URL=https://DOMAIN/v1
+# The backend refuses to start in production if JWT_SECRET, JWT_REFRESH_SECRET,
+# or DATABASE_URL is missing.
 ```
 
-- Backend listens on **:8080** (base path `/v1`), frontend on **:3000**.
-- The backend container **runs DB migrations on start automatically** (idempotent —
-  safe on every restart). No manual migration step.
-- Seeded login: `admin@linenflow.com`. The password is `SEED_ADMIN_PASSWORD` on the
-  first migrate, or the public default `Admin123!` if you didn't set it — so **always set
-  `SEED_ADMIN_PASSWORD`**. The seed only applies while the password is unset; restarts never
-  clobber it. (There is no in-app password-change screen yet — see "Next step".)
-
-To update after a `git pull`:
+### 5. Build + start
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml ps
+curl -fsS http://127.0.0.1:8080/health          # backend health (localhost bind)
+curl -fsS https://$DOMAIN/health                # through Caddy once DNS + cert are up
+```
+Caddy fetches the TLS certificate on first request to `https://DOMAIN` (allow a few
+seconds). Watch it with `docker compose -f docker-compose.prod.yml logs -f caddy`.
+
+Seeded login: `admin@linenflow.com` / your `SEED_ADMIN_PASSWORD`. Change it in-app
+(the **Account** page) after first login.
+
+### 6. Backups (do this before real data lands)
+```bash
+./scripts/backup-db.sh                          # writes ./backups/linenflow-<ts>.sql.gz
+crontab -e
+# 30 2 * * * cd /opt/linenflow && ./scripts/backup-db.sh >> /var/log/linenflow-backup.log 2>&1
+```
+Then copy dumps **off the Droplet** (DigitalOcean Spaces / another host) — a backup
+that only lives on the same VPS doesn't survive the VPS dying.
+
+### Updating after a `git pull`
+```bash
+cd /opt/linenflow && git pull
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-Logs / teardown:
+### Logs / teardown
 ```bash
 docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml down           # keep data
-docker compose -f docker-compose.prod.yml down -v         # WIPE the database volume
+docker compose -f docker-compose.prod.yml down          # keep data
+docker compose -f docker-compose.prod.yml down -v        # WIPE the database volume
 ```
+
+---
+
+## Production checklist
+
+- [ ] DNS A record → Droplet IP, resolving before first start
+- [ ] `ufw` allows only 22 / 80 / 443
+- [ ] Strong, unique `JWT_SECRET` and `JWT_REFRESH_SECRET`
+- [ ] Strong `DB_PASSWORD`; Postgres port **not** published (it isn't, by default)
+- [ ] `DOMAIN` + `ACME_EMAIL` set; TLS cert issued (check Caddy logs)
+- [ ] `CORS_ORIGIN=https://DOMAIN` and `NEXT_PUBLIC_API_URL=https://DOMAIN/v1`
+- [ ] `SEED_ADMIN_PASSWORD` set; admin password changed in-app after first login
+- [ ] `.env.prod` is **not** committed (it's git-ignored — keep it that way)
+- [ ] Nightly `pg_dump` cron running **and** dumps copied off-box
+- [ ] (2 GB) swap enabled
 
 ---
 
@@ -70,49 +142,10 @@ npm start                     # or run under pm2/systemd
 
 Frontend:
 ```bash
-npm ci --legacy-peer-deps     # legacy flag needed: some peers lag React 19
-NEXT_PUBLIC_API_URL=https://api.your-domain/v1 npm run build
+npm ci --legacy-peer-deps     # some peers lag React 19
+NEXT_PUBLIC_API_URL=https://your-domain/v1 npm run build
 npm start                     # serves on :3000
 ```
 
-Put a reverse proxy (nginx/Caddy) in front for TLS and to route the public
-domain to :3000 (frontend) and :8080 (API).
-
----
-
-## Reverse proxy sketch (nginx)
-
-```nginx
-server {
-  server_name your-domain.example;
-  location /v1/     { proxy_pass http://127.0.0.1:8080; }
-  location /health  { proxy_pass http://127.0.0.1:8080; }
-  location /        { proxy_pass http://127.0.0.1:3000; }
-}
-```
-If the API is served under the same domain at `/v1`, set
-`NEXT_PUBLIC_API_URL=https://your-domain.example/v1` and
-`CORS_ORIGIN=https://your-domain.example`.
-
----
-
-## Production checklist
-
-- [ ] Strong, unique `JWT_SECRET` and `JWT_REFRESH_SECRET`
-- [ ] Strong `DB_PASSWORD`; Postgres port **not** published to the internet
-- [ ] `CORS_ORIGIN` set to the real frontend origin (not `*`, not localhost)
-- [ ] `NEXT_PUBLIC_API_URL` points at the public API URL
-- [ ] `SEED_ADMIN_PASSWORD` set to a strong value (so `admin@linenflow.com` is never `Admin123!`)
-- [ ] TLS terminated at the reverse proxy
-- [ ] Database volume backed up (`postgres_data`)
-
----
-
-## Next step (remaining)
-
-Authentication is done — real login/logout/refresh via `lib/api/` + `AuthContext`.
-What's left is the **business data**: customers, inventory, job orders, finance
-pages still read mock data. To finish:
-1. Build the backend data modules (routes/controllers/models mirroring `auth`/`sync`).
-2. Add matching `lib/api/*` modules using the existing `apiFetch` client.
-3. Swap mock data reads on each page for API calls (SWR/React Query recommended).
+Put Caddy (or nginx) in front for TLS, routing `/v1/*` + `/health` to `:8080` and
+everything else to `:3000`, exactly as `Caddyfile` / the compose stack do.

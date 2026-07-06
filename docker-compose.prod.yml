@@ -1,10 +1,15 @@
 # ── LinenFlow™ full-stack production stack ──────────────────────────────────
 # Usage:
-#   1. cp .env.prod.example .env.prod  &&  edit the secrets
-#   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   1. cp .env.prod.example .env.prod   &&  edit secrets + DOMAIN + ACME_EMAIL
+#   2. Point DOMAIN's DNS A record at this server's public IP
+#   3. Open only 22/80/443 on the firewall (see DEPLOYMENT.md)
+#   4. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 #
-# The backend container runs DB migrations on start (idempotent), so no manual
-# migration step is required.
+# Caddy terminates TLS (auto Let's Encrypt) and is the ONLY service exposed to the
+# internet. It routes /v1/* + /health -> backend and everything else -> frontend,
+# both of which are reachable only on the internal Docker network (plus a
+# localhost-only bind for on-box debugging). Postgres is never published.
+# The backend runs DB migrations on start (idempotent), so no manual step is needed.
 services:
   postgres:
     image: postgres:14-alpine
@@ -16,10 +21,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # No host port published by default — only the backend needs it on the
-    # internal network. Uncomment to expose for debugging.
-    # ports:
-    #   - "5432:5432"
+    # No host port published — only the backend reaches it on the internal network.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
@@ -49,22 +51,53 @@ services:
       # Strong first-run superadmin password (avoids the public 'Admin123!' default).
       # Only applied while the password is still unset; never clobbers a later change.
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+    # Localhost-only publish for debugging / SSH tunnels — NOT exposed to the internet.
+    # Caddy reaches the API as "backend:8080" over the internal network regardless.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
       context: .
       args:
-        # Public URL the browser uses to reach the API (inlined at build time)
+        # Public URL the browser uses to reach the API (inlined at build time).
+        # Same-origin: https://DOMAIN/v1  (Caddy proxies /v1/* to the backend).
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: linenflow-frontend
     restart: unless-stopped
     depends_on:
       - backend
+    # Localhost-only publish for debugging; public traffic arrives via Caddy.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: linenflow-caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   postgres_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
     driver: local
