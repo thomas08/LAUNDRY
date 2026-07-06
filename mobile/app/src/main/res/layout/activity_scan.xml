@@ -20,7 +20,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="56dp"
-            android:text="@string/back_th"
+            android:text="@string/back"
             android:textColor="@color/white"
             android:textSize="20sp" />
 
@@ -131,7 +131,7 @@
                 style="?attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/clear_th" />
+                android:text="@string/clear" />
         </LinearLayout>
 
         <TextView

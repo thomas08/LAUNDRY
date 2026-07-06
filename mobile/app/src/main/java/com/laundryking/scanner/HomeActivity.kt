@@ -20,6 +20,9 @@ class HomeActivity : AppCompatActivity() {
         b = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(b.root)
 
+        b.btnLangEn.setOnClickListener { Locales.set("en") }
+        b.btnLangTh.setOnClickListener { Locales.set("th") }
+
         b.btnDispatch.setOnClickListener { open(Mode.DISPATCH) }
         b.btnReturn.setOnClickListener { open(Mode.RETURN) }
         b.btnWash.setOnClickListener { open(Mode.PICKUP) }

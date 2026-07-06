@@ -23,6 +23,9 @@ class LoginActivity : AppCompatActivity() {
 
         if (session.isLoggedIn) { goMain(); return }
 
+        b.btnLangEn.setOnClickListener { Locales.set("en") }
+        b.btnLangTh.setOnClickListener { Locales.set("th") }
+
         b.baseUrl.setText(session.baseUrl)
         b.branchId.setText(session.branchId)
         b.deviceId.setText(session.deviceId)

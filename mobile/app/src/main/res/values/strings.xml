@@ -13,46 +13,30 @@
     <string name="enter_credentials">Enter email and password</string>
     <string name="login_failed">Login failed</string>
 
-    <!-- Main -->
-    <string name="mode">Mode</string>
-    <string name="hint_job_order">Job order id (Dispatch, optional)</string>
-    <string name="hint_register_type">Linen type (Register, optional)</string>
-    <string name="hint_tag">Scan or type tag (EPC)</string>
-    <string name="add">Add</string>
-    <string name="clear">Clear</string>
-    <string name="start_scan">Start scan</string>
-    <string name="stop_scan">Stop scan</string>
-    <string name="submit">Submit</string>
-    <string name="sync_ref">Sync reference</string>
-    <string name="logout">Logout</string>
-    <string name="reader_ready">Reader ready</string>
-    <string name="reader_unavailable">Reader unavailable — manual entry only</string>
-    <string name="no_tags">No tags yet. Scan or type a tag.</string>
-    <string name="tag_count">%1$d tag(s) queued</string>
-    <string name="uploading">Uploading…</string>
-    <string name="syncing_ref">Syncing reference…</string>
-    <string name="sync_failed">Sync failed</string>
-    <string name="result_summary">%1$d applied · %2$d rejected</string>
-    <string name="upload_failed">Upload failed (kept for retry): %1$s</string>
-    <string name="ref_summary">Cached: %1$s · %2$d customers · %3$d open orders</string>
-    <string name="pending_count">Pending in queue: %1$d</string>
+    <!-- Home -->
+    <string name="home_title">Choose a task</string>
+    <string name="logout">Log out</string>
+    <string name="mode_dispatch">📤  Dispatch</string>
+    <string name="mode_return">📥  Return</string>
+    <string name="mode_wash">🧺  To wash</string>
+    <string name="mode_stock">🔢  Stock count</string>
+    <string name="mode_register">➕  Register</string>
 
-    <!-- Simplified Thai UI (Home + Scan) for floor staff -->
-    <string name="home_title">เลือกงาน</string>
-    <string name="scan_count">%1$d</string>
-    <string name="scan_count_label">ชิ้น</string>
-    <string name="scan_start">▶ เริ่มสแกน</string>
-    <string name="scan_stop">■ หยุด</string>
-    <string name="save_btn">✓ บันทึก</string>
-    <string name="clear_th">ล้าง</string>
-    <string name="back_th">‹ กลับ</string>
-    <string name="saving_th">กำลังบันทึก…</string>
-    <string name="result_ok_th">✅ สำเร็จ %1$d ชิ้น</string>
-    <string name="result_reject_th">⚠️ ไม่ผ่าน %1$d ชิ้น</string>
-    <string name="pull_trigger">ดึงไกปืนเพื่อยิงแท็ก\nหรือกดปุ่มด้านล่าง</string>
-    <string name="reader_off_th">อ่าน RFID ไม่ได้ — พิมพ์แท็กเองด้านล่าง</string>
-    <string name="upload_fail_th">ยังไม่ได้ส่ง เก็บไว้ลองใหม่</string>
-    <string name="logout_th">ออกจากระบบ</string>
-    <string name="pending_th">รอส่ง %1$d</string>
-    <string name="last_tag">ล่าสุด: %1$s</string>
+    <!-- Scan -->
+    <string name="back">‹ Back</string>
+    <string name="scan_start">▶ Start scan</string>
+    <string name="scan_stop">■ Stop</string>
+    <string name="save_btn">✓ Save</string>
+    <string name="clear">Clear</string>
+    <string name="add">Add</string>
+    <string name="hint_tag">Scan or type tag</string>
+    <string name="scan_count_label">items</string>
+    <string name="last_tag">Last: %1$s</string>
+    <string name="pull_trigger">Pull the trigger to scan\nor use the button below</string>
+    <string name="reader_off">RFID reader not available — type tags below</string>
+    <string name="saving">Saving…</string>
+    <string name="result_ok">✅ %1$d saved</string>
+    <string name="result_reject">⚠️ %1$d rejected</string>
+    <string name="upload_fail">Not sent — kept for retry</string>
+    <string name="pending">Pending: %1$d</string>
 </resources>

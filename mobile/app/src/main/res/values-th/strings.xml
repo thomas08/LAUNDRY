@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LaundryKing Scanner</string>
+
+    <!-- Login -->
+    <string name="hint_email">อีเมล</string>
+    <string name="hint_password">รหัสผ่าน</string>
+    <string name="hint_base_url">API base URL</string>
+    <string name="hint_branch">รหัสสาขา</string>
+    <string name="hint_device">รหัสเครื่อง</string>
+    <string name="sign_in">เข้าสู่ระบบ</string>
+    <string name="signing_in">กำลังเข้าสู่ระบบ…</string>
+    <string name="enter_credentials">กรอกอีเมลและรหัสผ่าน</string>
+    <string name="login_failed">เข้าสู่ระบบไม่สำเร็จ</string>
+
+    <!-- Home -->
+    <string name="home_title">เลือกงาน</string>
+    <string name="logout">ออกจากระบบ</string>
+    <string name="mode_dispatch">📤  จ่ายออก</string>
+    <string name="mode_return">📥  รับคืน</string>
+    <string name="mode_wash">🧺  ส่งซัก</string>
+    <string name="mode_stock">🔢  ตรวจนับ</string>
+    <string name="mode_register">➕  ลงทะเบียน</string>
+
+    <!-- Scan -->
+    <string name="back">‹ กลับ</string>
+    <string name="scan_start">▶ เริ่มสแกน</string>
+    <string name="scan_stop">■ หยุด</string>
+    <string name="save_btn">✓ บันทึก</string>
+    <string name="clear">ล้าง</string>
+    <string name="add">เพิ่ม</string>
+    <string name="hint_tag">สแกนหรือพิมพ์แท็ก</string>
+    <string name="scan_count_label">ชิ้น</string>
+    <string name="last_tag">ล่าสุด: %1$s</string>
+    <string name="pull_trigger">ดึงไกปืนเพื่อยิงแท็ก\nหรือกดปุ่มด้านล่าง</string>
+    <string name="reader_off">อ่าน RFID ไม่ได้ — พิมพ์แท็กด้านล่าง</string>
+    <string name="saving">กำลังบันทึก…</string>
+    <string name="result_ok">✅ สำเร็จ %1$d ชิ้น</string>
+    <string name="result_reject">⚠️ ไม่ผ่าน %1$d ชิ้น</string>
+    <string name="upload_fail">ยังไม่ได้ส่ง เก็บไว้ลองใหม่</string>
+    <string name="pending">รอส่ง %1$d</string>
+</resources>

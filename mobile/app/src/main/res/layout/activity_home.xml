@@ -10,6 +10,31 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- Language toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnLangEn"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="64dp"
+                android:text="EN" />
+
+            <Button
+                android:id="@+id/btnLangTh"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:minWidth="64dp"
+                android:text="ไทย" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/homeBranch"
             android:layout_width="match_parent"
@@ -24,31 +49,31 @@
             android:id="@+id/btnDispatch"
             style="@style/BigTile"
             android:backgroundTint="@color/mode_dispatch"
-            android:text="📤  จ่ายออก" />
+            android:text="@string/mode_dispatch" />
 
         <Button
             android:id="@+id/btnReturn"
             style="@style/BigTile"
             android:backgroundTint="@color/mode_return"
-            android:text="📥  รับคืน" />
+            android:text="@string/mode_return" />
 
         <Button
             android:id="@+id/btnWash"
             style="@style/BigTile"
             android:backgroundTint="@color/mode_wash"
-            android:text="🧺  ส่งซัก" />
+            android:text="@string/mode_wash" />
 
         <Button
             android:id="@+id/btnStock"
             style="@style/BigTile"
             android:backgroundTint="@color/mode_stock"
-            android:text="🔢  ตรวจนับ" />
+            android:text="@string/mode_stock" />
 
         <Button
             android:id="@+id/btnRegister"
             style="@style/BigTile"
             android:backgroundTint="@color/mode_register"
-            android:text="➕  ลงทะเบียน" />
+            android:text="@string/mode_register" />
 
         <Button
             android:id="@+id/btnLogout"
@@ -56,7 +81,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="@string/logout_th"
+            android:text="@string/logout"
             android:textColor="#888888" />
     </LinearLayout>
 </ScrollView>

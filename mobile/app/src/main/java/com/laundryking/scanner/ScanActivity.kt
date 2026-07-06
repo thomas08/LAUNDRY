@@ -39,6 +39,14 @@ class ScanActivity : AppCompatActivity() {
         Mode.REGISTER -> R.color.mode_register
     }
 
+    private fun modeLabel(m: Mode) = when (m) {
+        Mode.DISPATCH -> R.string.mode_dispatch
+        Mode.RETURN -> R.string.mode_return
+        Mode.PICKUP -> R.string.mode_wash
+        Mode.STOCK_CHECK -> R.string.mode_stock
+        Mode.REGISTER -> R.string.mode_register
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityScanBinding.inflate(layoutInflater)
@@ -48,12 +56,12 @@ class ScanActivity : AppCompatActivity() {
         queue = ScanQueue(this)
 
         mode = Mode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: Mode.DISPATCH.name)
-        b.modeHeader.text = mode.thLabel
+        b.modeHeader.setText(modeLabel(mode))
         b.header.setBackgroundColor(ContextCompat.getColor(this, modeColor(mode)))
 
         val ready = uhf.init(this)
         uhf.setOnTag { epc -> runOnUiThread { addTag(epc) } }
-        if (!ready) b.hint.setText(R.string.reader_off_th)
+        if (!ready) b.hint.setText(R.string.reader_off)
 
         b.btnBack.setOnClickListener { finish() }
         b.scanToggle.setOnClickListener { toggleScan() }
@@ -103,7 +111,7 @@ class ScanActivity : AppCompatActivity() {
         b.saveBtn.isEnabled = false
         b.result.visibility = View.VISIBLE
         b.result.setTextColor(ContextCompat.getColor(this, R.color.mode_register))
-        b.result.setText(R.string.saving_th)
+        b.result.setText(R.string.saving)
         lifecycleScope.launch {
             try {
                 val pending = withContext(Dispatchers.IO) { queue.all() }
@@ -114,15 +122,15 @@ class ScanActivity : AppCompatActivity() {
                 updatePending()
                 if (rejected == 0) {
                     b.result.setTextColor(ContextCompat.getColor(this@ScanActivity, R.color.ok_green))
-                    b.result.text = getString(R.string.result_ok_th, applied)
+                    b.result.text = getString(R.string.result_ok, applied)
                 } else {
                     b.result.setTextColor(ContextCompat.getColor(this@ScanActivity, R.color.reject_red))
-                    b.result.text = getString(R.string.result_ok_th, applied) + "\n" +
-                        getString(R.string.result_reject_th, rejected)
+                    b.result.text = getString(R.string.result_ok, applied) + "\n" +
+                        getString(R.string.result_reject, rejected)
                 }
             } catch (e: Exception) {
                 b.result.setTextColor(ContextCompat.getColor(this@ScanActivity, R.color.reject_red))
-                b.result.text = getString(R.string.upload_fail_th)
+                b.result.text = getString(R.string.upload_fail)
             } finally {
                 b.saveBtn.isEnabled = true
             }
@@ -131,7 +139,7 @@ class ScanActivity : AppCompatActivity() {
 
     private fun updatePending() {
         val n = queue.size()
-        b.pending.text = if (n > 0) getString(R.string.pending_th, n) else ""
+        b.pending.text = if (n > 0) getString(R.string.pending, n) else ""
     }
 
     override fun onDestroy() {
