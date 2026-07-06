@@ -62,11 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_users_branch_id ON users(branch_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 
--- Insert default branches
+-- Insert the default branch (single-tenant: one branch per deployment).
+-- For a new customer, change these values (or add rows) before the first migrate.
 INSERT INTO branches (id, code, name, address) VALUES
-  ('branch-1', 'BKK01', 'Bangkok Central', '123 Silom Road, Bangkok 10500'),
-  ('branch-2', 'CNX01', 'Chiang Mai', '456 Nimmanhaemin Road, Chiang Mai 50200'),
-  ('branch-3', 'HKT01', 'Phuket', '789 Patong Beach Road, Phuket 83150')
+  ('branch-1', '001', 'LaundryKing', 'จังหวัดระนอง')
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert default superadmin user
@@ -75,11 +74,9 @@ INSERT INTO users (id, email, password_hash, name, role, branch_id, is_active) V
   ('user-superadmin', 'admin@linenflow.com', '$2a$10$YourHashedPasswordHere', 'Super Administrator', 'superadmin', 'branch-1', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Insert superadmin branch associations (all branches)
+-- Insert superadmin branch associations
 INSERT INTO user_branches (user_id, branch_id) VALUES
-  ('user-superadmin', 'branch-1'),
-  ('user-superadmin', 'branch-2'),
-  ('user-superadmin', 'branch-3')
+  ('user-superadmin', 'branch-1')
 ON CONFLICT DO NOTHING;
 
 -- Create updated_at trigger function

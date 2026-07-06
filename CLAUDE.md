@@ -493,9 +493,57 @@ images: { unoptimized: true }              // Deployment flexibility
 
 ### No Test Framework
 
-Currently no test framework is configured. Consider adding:
-- Jest + React Testing Library
-- Playwright for E2E tests
+**Vitest** is configured in both projects (frontend `pnpm test`, backend `cd backend && npm test`).
+Current coverage is unit-level: frontend `lib/api/*.test.ts` (request shape + `normalize` coercion
+via a mocked `apiFetch`) and backend pure logic (`applyStockMovement`, `resolvePeriodRange`,
+`pctChange`). Still missing: component/RTL tests and Playwright E2E.
+
+## Production Deployment & Maintenance
+
+**Live:** the first customer **LaundryKing** runs in production at
+**https://laundryking.senses-iot.com**. Full deploy guide is in `DEPLOYMENT.md`; this is the
+operational quick-reference.
+
+- **Host:** DigitalOcean droplet **157.245.57.27** (Ubuntu 24.04, 2 vCPU / 4 GB, SGP1).
+  SSH `root@157.245.57.27` (deploy machine's ed25519 key). App dir: **`/opt/linenflow`**.
+- **Stack:** `docker compose -f docker-compose.prod.yml --env-file .env.prod` — 4 containers:
+  `caddy` (TLS, only 80/443 public) → `frontend` (:3000) + `backend` (:8080) → `postgres`.
+  `ufw` allows only 22/80/443; backend/frontend bind `127.0.0.1` for on-box debug only.
+- **Deploy method = SSH-driven** (no CI). To ship changes: `rsync` the repo to
+  `/opt/linenflow` (exclude `node_modules`/`.next`/`.git`/`.env*`/`backups`), then
+  `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`. Migrations
+  run automatically on backend start (idempotent).
+- **Secrets:** `/opt/linenflow/.env.prod` (chmod 600, git-ignored, generated on the box with
+  `openssl rand`). Holds `DOMAIN`, `ACME_EMAIL`, DB creds, JWT secrets, `SEED_ADMIN_PASSWORD`,
+  `CORS_ORIGIN`, `NEXT_PUBLIC_API_URL` (all same-origin `https://DOMAIN` + `/v1`).
+- **⚠️ Lockfile gotcha:** the Docker builds use `npm ci`, which fails if `package-lock.json`
+  drifts from `package.json` (it happened once because tests were added with pnpm at root +
+  npm in backend). If `npm ci` fails with "Missing … from lock file", regenerate the lock in
+  the build image: `docker run --rm -v "$PWD":/w -w /w node:20-alpine npm install
+  --package-lock-only [--legacy-peer-deps for root]`, then commit the lock.
+- **TLS/DNS:** Cloudflare hosts `senses-iot.com`. The `laundryking` A record is **DNS-only
+  (grey cloud)** so Caddy can complete the Let's Encrypt HTTP-01 challenge. If the orange-cloud
+  proxy is ever enabled, set Cloudflare SSL mode to **Full (Strict)**.
+- **Backups:** `scripts/backup-db.sh` runs nightly via cron (02:30) → `/opt/linenflow/backups`.
+  **TODO: copy dumps off-box** (Spaces/S3) — an on-box-only backup doesn't survive droplet loss.
+- **Multi-tenancy = one droplet/stack per customer** at `<customer>.senses-iot.com`. Each is a
+  single-tenant deployment with its own `DOMAIN` + DB. To onboard a new customer: new droplet,
+  new subdomain, edit the branch seed (below), deploy.
+
+### Branch setup (single-branch, no list endpoint yet)
+There is **no `GET /v1/branches` endpoint**; branch display (name/code/address) is hardcoded in
+`contexts/BranchContext.tsx` and **must match the seeded DB rows** in `backend/src/db/schema.sql`.
+LaundryKing has one branch: id `branch-1`, code `001`, name `LaundryKing`, `จังหวัดระนอง`.
+To change/add branches you must edit **both** places (and for an already-live DB, run SQL against
+the running `postgres` container, since the `schema.sql` seed is `ON CONFLICT DO NOTHING` and won't
+update existing rows). Building a real branches endpoint would remove this dual-maintenance.
+
+### Customer-handoff state (what's real vs pending)
+Every business-data page is backend-wired and the production DB starts empty (ready for real data).
+**Hidden until built:** AI Scanner (commented out in `components/sidebar.tsx`; no backend).
+**Still on mock data pending the scanner phase:** `checkin` and `operations/dispatch` (plus
+`components/DispatchLabel.tsx`, `lib/mockData.ts`) — these will be wired when the RFID handheld
+scanner work lands (device uploads to `/v1/sync/batch`, already implemented).
 
 ## Documentation Files
 

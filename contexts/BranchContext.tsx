@@ -20,30 +20,17 @@ interface BranchContextType {
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined)
 
-// Mock branches for development
+// Branch display list. There is no GET /v1/branches endpoint yet, so branch
+// name/code/address are sourced here and MUST match the seeded rows in the DB
+// (backend/src/db/schema.sql). Single-tenant: one branch per deployment — add
+// entries here (and seed rows) when the customer opens more branches.
 const mockBranches: Branch[] = [
   {
     id: 'branch-1',
-    name: 'Bangkok Central',
-    code: 'BKK01',
-    address: '123 Sukhumvit Rd, Bangkok 10110',
-    phone: '+66-2-123-4567',
-    isActive: true,
-  },
-  {
-    id: 'branch-2',
-    name: 'Chiang Mai',
-    code: 'CNX01',
-    address: '456 Nimmanhaemin Rd, Chiang Mai 50200',
-    phone: '+66-53-456-7890',
-    isActive: true,
-  },
-  {
-    id: 'branch-3',
-    name: 'Phuket',
-    code: 'HKT01',
-    address: '789 Patong Beach Rd, Phuket 83150',
-    phone: '+66-76-789-0123',
+    name: 'LaundryKing',
+    code: '001',
+    address: 'จังหวัดระนอง',
+    phone: '',
     isActive: true,
   },
 ]
