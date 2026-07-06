@@ -164,12 +164,37 @@ export class SyncModel {
     };
   }
 
-  /** ข้อมูลอ้างอิงให้ handheld cache ไว้ใช้ตอนออฟไลน์ (ตอนนี้มีแค่ branch เพราะ customers/job_orders ยังไม่มี module) */
+  /**
+   * ข้อมูลอ้างอิงให้ handheld (Chainway C72) cache ไว้ใช้ตอนออฟไลน์:
+   *   - branch: สาขาที่กำลังทำงาน
+   *   - customers: ลูกค้าของสาขา (ใช้ตอน pickup/COG เลือกเจ้าของผ้า)
+   *   - jobOrders: ใบสั่งงานที่ยัง "เปิด" อยู่ (ใช้ตอน job_order_link ผูกผ้ากับงาน)
+   * ปรับ sync/reference version ทุกครั้งที่เพิ่ม field เพื่อให้เครื่องรู้ว่าต้อง refresh cache
+   */
   static async getReferenceData(branchId: string) {
     const branch = await query(
       `SELECT id, code, name FROM branches WHERE id = $1 AND is_active = true`,
       [branchId]
     );
-    return { branch: branch[0] || null, customers: [], jobOrders: [] };
+    const customers = await query(
+      `SELECT id, name, customer_type AS "customerType", phone
+         FROM customers
+        WHERE branch_id = $1 AND is_active = true
+        ORDER BY name`,
+      [branchId]
+    );
+    const jobOrders = await query(
+      `SELECT id, order_number AS "orderNumber", customer_id AS "customerId", status
+         FROM job_orders
+        WHERE branch_id = $1 AND status NOT IN ('delivered', 'cancelled')
+        ORDER BY created_at DESC`,
+      [branchId]
+    );
+    return {
+      branch: branch[0] || null,
+      customers,
+      jobOrders,
+      syncedAt: new Date().toISOString(),
+    };
   }
 }
