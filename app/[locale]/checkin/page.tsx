@@ -1,184 +1,118 @@
 'use client'
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
-import { useAuth, useUser } from '@/contexts/AuthContext'
-import { useBranch } from '@/contexts/BranchContext'
-import { filterByBranchAccess } from '@/lib/auth'
-import { LinenItem } from "@/lib/types"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Scan, Plus, CheckCircle, AlertCircle, Users, TrendingUp } from "lucide-react"
+import { useAuth } from '@/contexts/AuthContext'
+import { useCurrentBranchId } from '@/contexts/BranchContext'
+import { fetchLinenItems, type LinenItemRow } from '@/lib/api/linen-items'
+import { syncBatch, buildStatusChangeEvents, type SyncEventResult } from '@/lib/api/sync'
+import { ApiError } from '@/lib/api/client'
+import type { LinenItemStatus } from '@/lib/types'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import {
+  Scan, ScanLine, CheckCircle, AlertCircle, Loader2, X, Users, TrendingUp,
+} from 'lucide-react'
 
-// Mock linen inventory data for check-in (items currently on rent)
-const mockRentedItems: (LinenItem & { branchId: string; customerName?: string })[] = [
-  // Bangkok Central (branch-1)
-  {
-    id: "linen-002",
-    tagId: "LN002",
-    type: "towel",
-    customerId: "cust-002",
-    customerName: "Grand Palace Hotel",
-    status: "on_rent",
-    washCycles: 8,
-    branchId: "branch-1",
-    createdAt: "2023-07-20T11:30:00Z"
-  },
-  {
-    id: "linen-005",
-    tagId: "LN005",
-    type: "pillow_case",
-    customerId: "cust-004",
-    customerName: "Silom Business Hotel",
-    status: "on_rent",
-    washCycles: 22,
-    branchId: "branch-1",
-    createdAt: "2023-10-12T16:20:00Z"
-  },
+const DEVICE_ID = 'web-checkin' // browser acts as the single scanner station (MVP)
 
-  // Chiang Mai (branch-2)
-  {
-    id: "linen-009",
-    tagId: "LN009",
-    type: "bed_sheet",
-    customerId: "cust-008",
-    customerName: "Ping River View Hotel",
-    status: "on_rent",
-    washCycles: 14,
-    branchId: "branch-2",
-    createdAt: "2023-09-30T11:00:00Z"
-  },
+type CheckinMode = 'return' | 'wash'
 
-  // Phuket (branch-3)
-  {
-    id: "linen-011",
-    tagId: "LN011",
-    type: "bed_sheet",
-    customerId: "cust-011",
-    customerName: "Patong Beach Resort",
-    status: "on_rent",
-    washCycles: 20,
-    branchId: "branch-3",
-    createdAt: "2023-06-28T14:15:00Z"
-  },
-  {
-    id: "linen-014",
-    tagId: "LN014",
-    type: "uniform",
-    customerId: "cust-015",
-    customerName: "Island Fitness Center",
-    status: "on_rent",
-    washCycles: 13,
-    branchId: "branch-3",
-    createdAt: "2023-09-05T16:45:00Z"
-  }
-]
+interface CheckinResult extends SyncEventResult {
+  tagId: string
+}
 
 export default function CheckInPage() {
   const t = useTranslations('checkin')
   const tCommon = useTranslations('common')
   const tInventory = useTranslations('inventory')
   const { hasPermission } = useAuth()
-  const user = useUser()
-  const { currentBranch } = useBranch()
+  const branchId = useCurrentBranchId()
 
-  const [tagId, setTagId] = useState("")
-  const [checkedInItems, setCheckedInItems] = useState<(LinenItem & { branchId: string; customerName?: string })[]>([])
-  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [mode, setMode] = useState<CheckinMode>('return')
+  const [tagInput, setTagInput] = useState('')
+  const [batchTags, setBatchTags] = useState<string[]>([])
 
-  // Filter items by branch access
-  const accessibleItems = useMemo(() => {
-    if (!user) return []
-    return filterByBranchAccess(user, mockRentedItems)
-  }, [user])
+  const [items, setItems] = useState<Map<string, LinenItemRow>>(new Map())
+  const [submitting, setSubmitting] = useState(false)
+  const [results, setResults] = useState<CheckinResult[]>([])
+  const [error, setError] = useState<string | null>(null)
 
-  const handleCheckIn = () => {
-    if (!hasPermission('create')) {
-      setAlert({ type: 'error', message: t('noPermission') })
-      setTimeout(() => setAlert(null), 3000)
-      return
+  const canUpdate = hasPermission('update')
+
+  // Fetch the branch's linen items into a tagId→row map for advisory lookup.
+  const loadItems = useCallback(async () => {
+    try {
+      const list = await fetchLinenItems()
+      setItems(new Map(list.map((r) => [r.tagId.toUpperCase(), r])))
+    } catch {
+      setItems(new Map())
     }
+  }, [])
 
-    if (!tagId.trim()) {
-      setAlert({ type: 'error', message: t('enterTagId') })
-      return
-    }
+  useEffect(() => { loadItems() }, [loadItems])
 
-    // Check if item already checked in
-    if (checkedInItems.some(item => item.tagId === tagId)) {
-      setAlert({ type: 'error', message: t('alreadyCheckedIn', { tagId }) })
-      return
-    }
+  const newStatus: LinenItemStatus = mode === 'return' ? 'In Stock' : 'Washing'
 
-    // Find item in accessible inventory
-    const item = accessibleItems.find(item => item.tagId === tagId)
-
-    if (!item) {
-      setAlert({ type: 'error', message: t('itemNotFound', { tagId }) })
-      return
-    }
-
-    if (item.status !== 'on_rent') {
-      setAlert({ type: 'error', message: t('notOnRent', { tagId, status: item.status }) })
-      return
-    }
-
-    // Create checked-in item with updated status
-    const checkedInItem = {
-      ...item,
-      status: 'washing' as const
-    }
-
-    setCheckedInItems(prev => [...prev, checkedInItem])
-    setAlert({ type: 'success', message: t('successMessage', { tagId }) })
-    setTagId("")
-
-    // Clear alert after 3 seconds
-    setTimeout(() => setAlert(null), 3000)
+  const addBatchTag = () => {
+    const v = tagInput.trim().toUpperCase()
+    if (!v) return
+    setBatchTags((prev) => (prev.includes(v) ? prev : [...prev, v]))
+    setTagInput('')
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleCheckIn()
-    }
-  }
+  const submit = useCallback(async () => {
+    setError(null)
+    setResults([])
+    if (!branchId) { setError(t('noBranch')); return }
+    const cleaned = Array.from(new Set(batchTags.map((x) => x.trim().toUpperCase()).filter(Boolean)))
+    if (cleaned.length === 0) { setError(t('noTags')); return }
 
-  const getLinenTypeKey = (type: string) => {
-    const typeMap: Record<string, string> = {
-      'bed_sheet': 'bedSheet',
-      'pillow_case': 'pillowCase',
-      'duvet_cover': 'duvetCover',
-      'tablecloth': 'tablecloth',
-      'towel': 'towel',
-      'bathrobe': 'bathrobe',
-      'uniform': 'uniform',
-      'napkin': 'napkin',
-      'curtain': 'curtain'
+    setSubmitting(true)
+    try {
+      const events = buildStatusChangeEvents({ tagIds: cleaned, branchId, newStatus })
+      const byUuid = new Map(events.map((e) => [e.clientUuid, e.tagId]))
+      const res = await syncBatch(DEVICE_ID, events)
+      const mapped: CheckinResult[] = res.map((r) => ({ ...r, tagId: byUuid.get(r.clientUuid) ?? '?' }))
+      setResults(mapped)
+      // Clear the queue only if every tag was accepted; keep failures for retry.
+      if (mapped.every((r) => r.result === 'applied')) setBatchTags([])
+      // Refresh the lookup map so statuses reflect the applied changes.
+      loadItems()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('submitError'))
+    } finally {
+      setSubmitting(false)
     }
-    return typeMap[type] || type
-  }
+  }, [branchId, batchTags, newStatus, t, loadItems])
 
-  // Calculate stats
+  const appliedCount = results.filter((r) => r.result === 'applied').length
+  const rejectedCount = results.filter((r) => r.result === 'rejected').length
+
   const stats = useMemo(() => {
-    const itemsCount = checkedInItems.length
-    const customersCount = new Set(checkedInItems.map(item => item.customerId)).size
-    const avgWashCycles = itemsCount > 0
-      ? Math.round(checkedInItems.reduce((sum, item) => sum + item.washCycles, 0) / itemsCount)
+    const applied = results.filter((r) => r.result === 'applied')
+    const rows = applied
+      .map((r) => items.get(r.tagId.toUpperCase()))
+      .filter((r): r is LinenItemRow => !!r)
+    const customersCount = new Set(rows.map((r) => r.customerId).filter(Boolean)).size
+    const avgWashCycles = rows.length > 0
+      ? Math.round(rows.reduce((sum, r) => sum + (r.washCycles || 0), 0) / rows.length)
       : 0
+    return { itemsCount: applied.length, customersCount, avgWashCycles }
+  }, [results, items])
 
-    return { itemsCount, customersCount, avgWashCycles }
-  }, [checkedInItems])
-
-  if (!user) {
+  if (!canUpdate) {
     return (
       <div className="min-h-screen p-8">
-        <div className="flex items-center justify-center">
-          <div className="text-muted-foreground">{tCommon('loading')}</div>
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{t('noPermission')}</AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -190,130 +124,142 @@ export default function CheckInPage() {
         <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
       </div>
 
-      {/* Check-in Form */}
-      <Card className="mb-8 border-border bg-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
-            <Scan className="h-5 w-5" />
-            {t('scanOrEnter')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder={t('placeholder')}
-                value={tagId}
-                onChange={(e) => setTagId(e.target.value.toUpperCase())}
-                onKeyPress={handleKeyPress}
-                className="text-lg"
-                autoFocus
-                disabled={!hasPermission('create')}
-              />
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Scan / queue card */}
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold text-foreground">
+              <Scan className="h-5 w-5" />
+              {t('scanOrEnter')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Action mode */}
+            <div className="space-y-2">
+              <Label>{t('mode')}</Label>
+              <Tabs value={mode} onValueChange={(v) => setMode(v as CheckinMode)}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="return">{t('modeReturn')}</TabsTrigger>
+                  <TabsTrigger value="wash">{t('modeWash')}</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
+
+            {/* Scan input */}
+            <div className="space-y-2">
+              <Label>{t('scanTag')}</Label>
+              <div className="flex gap-2">
+                <Input
+                  className="font-mono text-lg"
+                  placeholder={t('placeholder')}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addBatchTag() } }}
+                  autoFocus
+                />
+                <Button variant="outline" onClick={addBatchTag} title={t('addTag')}>
+                  <ScanLine className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Queue */}
+            {batchTags.length > 0 && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="mb-2 text-sm text-muted-foreground">
+                  {t('queued', { count: batchTags.length })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {batchTags.map((tag) => {
+                    const row = items.get(tag)
+                    return (
+                      <Badge key={tag} variant="secondary" className="gap-1 font-mono">
+                        {tag}
+                        {row && (
+                          <span className="text-[10px] font-normal text-muted-foreground">
+                            ({row.status})
+                          </span>
+                        )}
+                        <button onClick={() => setBatchTags((p) => p.filter((x) => x !== tag))}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             <Button
-              onClick={handleCheckIn}
-              className="px-6"
+              className="w-full"
               size="lg"
-              disabled={!hasPermission('create')}
+              onClick={submit}
+              disabled={submitting || batchTags.length === 0}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              {t('checkIn')}
+              {submitting
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <CheckCircle className="mr-2 h-4 w-4" />}
+              {t('submit', { count: batchTags.length })}
             </Button>
-          </div>
 
-          {!hasPermission('create') && (
-            <Alert className="mt-4 border-destructive bg-destructive/10">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <AlertDescription className="text-destructive">
-                {t('noPermission')}
-              </AlertDescription>
-            </Alert>
-          )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
 
-          {alert && (
-            <Alert className={`mt-4 ${alert.type === 'success' ? 'border-chart-3 bg-chart-3/10' : 'border-destructive bg-destructive/10'}`}>
-              {alert.type === 'success' ? (
-                <CheckCircle className="h-4 w-4 text-chart-3" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-destructive" />
+        {/* Results card */}
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-foreground">
+              {t('results')}
+              {results.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {t('resultSummary', { applied: appliedCount, rejected: rejectedCount })}
+                </span>
               )}
-              <AlertDescription className={alert.type === 'success' ? 'text-chart-3' : 'text-destructive'}>
-                {alert.message}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Checked-in Items */}
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-foreground">
-            {t('checkedInItems')} ({checkedInItems.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {checkedInItems.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">{tInventory('tagId')}</TableHead>
-                    <TableHead className="text-muted-foreground">{tCommon('type')}</TableHead>
-                    <TableHead className="text-muted-foreground">{tCommon('customer')}</TableHead>
-                    <TableHead className="text-muted-foreground">{t('previousStatus')}</TableHead>
-                    <TableHead className="text-muted-foreground">{t('newStatus')}</TableHead>
-                    <TableHead className="text-muted-foreground">{tInventory('washCycles')}</TableHead>
-                    {user.role !== 'user' && <TableHead className="text-muted-foreground">{tCommon('branch')}</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {checkedInItems.map((item, index) => (
-                    <TableRow key={`${item.tagId}-${index}`} className="border-border hover:bg-accent/50">
-                      <TableCell className="font-mono text-sm text-foreground">{item.tagId}</TableCell>
-                      <TableCell className="font-medium text-foreground">
-                        <Badge variant="outline">
-                          {tInventory(`types.${getLinenTypeKey(item.type)}` as any)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">{t('noResults')}</div>
+            ) : (
+              <div className="space-y-2">
+                {results.map((r) => {
+                  const row = items.get(r.tagId.toUpperCase())
+                  return (
+                    <div key={r.clientUuid} className="flex items-center justify-between rounded-lg border border-border p-3">
+                      <div className="flex items-center gap-2">
+                        {r.result === 'applied'
+                          ? <CheckCircle className="h-4 w-4 text-chart-3" />
+                          : <AlertCircle className="h-4 w-4 text-destructive" />}
+                        <div>
+                          <span className="font-mono text-sm font-medium">{r.tagId}</span>
+                          {row?.customerName && (
+                            <div className="text-xs text-muted-foreground">{row.customerName}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant={r.result === 'applied' ? 'default' : 'destructive'}>
+                          {t(`status.${r.result}`)}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-xs truncate">
-                        {item.customerName || item.customerId}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-chart-4/20 text-chart-4 border-chart-4/30">
-                          {tInventory('status.onRent')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {tInventory('status.washing')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{item.washCycles}</TableCell>
-                      {user.role !== 'user' && (
-                        <TableCell>
-                          <Badge variant="outline">
-                            {item.branchId === 'branch-1' ? 'BKK01' :
-                             item.branchId === 'branch-2' ? 'CNX01' : 'HKT01'}
-                          </Badge>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              {t('noItemsYet')}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        {r.reason && <div className="mt-1 text-xs text-muted-foreground">{r.reason}</div>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Quick Stats */}
-      {checkedInItems.length > 0 && (
+      {appliedCount > 0 && (
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <Card className="border-border bg-card">
             <CardContent className="p-4">
@@ -332,7 +278,7 @@ export default function CheckInPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-2xl font-bold text-foreground">{stats.customersCount}</div>
-                  <div className="text-sm text-muted-foreground">{tCommon('customers')}</div>
+                  <div className="text-sm text-muted-foreground">{tCommon('customer')}</div>
                 </div>
                 <Users className="h-8 w-8 text-blue-500" />
               </div>

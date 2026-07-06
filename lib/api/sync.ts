@@ -73,3 +73,48 @@ export function buildRegistrationEvents(params: {
     },
   }))
 }
+
+/**
+ * Build item_status_change events — one per tag — for check-in (Return
+ * `On-Rent → In Stock`, Send to wash `→ Washing`) and dispatch (`In Stock → On-Rent`).
+ * The server validates the transition per tag (rejecting e.g. an unknown tag or an
+ * event type illegal from the tag's current status), so each tag passes/fails
+ * independently. `jobOrderId` (dispatch) is carried on the same event and recorded in
+ * the scan-event audit log. `crypto.randomUUID()` gives each tag an idempotency key.
+ */
+export function buildStatusChangeEvents(params: {
+  tagIds: string[]
+  branchId: string
+  newStatus: LinenItemStatus
+  jobOrderId?: string | null
+}): ScanEventInput[] {
+  const now = new Date().toISOString()
+  return params.tagIds.map((tagId) => ({
+    clientUuid: crypto.randomUUID(),
+    eventType: 'item_status_change',
+    tagId,
+    branchId: params.branchId,
+    newStatus: params.newStatus,
+    jobOrderId: params.jobOrderId ?? null,
+    scannedAt: now,
+  }))
+}
+
+/**
+ * Build stock_check events — one per tag — for audit / cycle counting. No status
+ * change; the server only logs the scan (allowed from any current status). Rejected
+ * only when the tag is unknown (never commissioned via item_receive).
+ */
+export function buildStockCheckEvents(params: {
+  tagIds: string[]
+  branchId: string
+}): ScanEventInput[] {
+  const now = new Date().toISOString()
+  return params.tagIds.map((tagId) => ({
+    clientUuid: crypto.randomUUID(),
+    eventType: 'stock_check',
+    tagId,
+    branchId: params.branchId,
+    scannedAt: now,
+  }))
+}
