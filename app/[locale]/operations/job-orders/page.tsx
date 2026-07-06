@@ -1,553 +1,416 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useAuth, useUser } from '@/contexts/AuthContext'
-import { useBranch } from '@/contexts/BranchContext'
-import { filterByBranchAccess } from '@/lib/auth'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCurrentBranchId, useBranch } from '@/contexts/BranchContext'
+import type { Customer, JobOrder, JobOrderStatus, ServiceType } from '@/lib/types'
+import { fetchCustomers } from '@/lib/api/customers'
+import {
+  fetchJobOrders, createJobOrder, updateJobOrder, updateJobOrderStatus, cancelJobOrder,
+  type JobOrderInput,
+} from '@/lib/api/job-orders'
+import { ApiError } from '@/lib/api/client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  FileText,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  Package,
-  Loader2
+  FileText, Clock, CheckCircle2, Plus, Edit, XCircle, Loader2, AlertCircle, Package,
 } from 'lucide-react'
-import type { JobOrder, JobOrderStatus, ServiceType } from '@/lib/types'
 
-// Mock job order data
-const mockJobOrders: JobOrder[] = [
-  {
-    id: 'job-001',
-    orderNumber: 'JO-2024-001',
-    customerId: 'cust-001',
-    customerName: 'Grand Plaza Hotel',
-    branchId: 'branch-1',
-    serviceType: 'wash_fold',
-    status: 'completed',
-    weight: 125.5,
-    itemCount: 450,
-    receivedAt: '2024-01-15T09:00:00Z',
-    dueDate: '2024-01-17T17:00:00Z',
-    completedAt: '2024-01-17T14:30:00Z',
-    assignedTo: 'user-1',
-    servicePrice: 15,
-    totalPrice: 1882.5,
-    notes: 'Rush order - VIP customer',
-    createdBy: 'user-1',
-    createdAt: '2024-01-15T09:00:00Z'
-  },
-  {
-    id: 'job-002',
-    orderNumber: 'JO-2024-002',
-    customerId: 'cust-002',
-    customerName: 'Riverside Hotel',
-    branchId: 'branch-1',
-    serviceType: 'dry_clean',
-    status: 'washing',
-    weight: 45.0,
-    itemCount: 120,
-    receivedAt: '2024-01-20T10:30:00Z',
-    dueDate: '2024-01-23T17:00:00Z',
-    assignedTo: 'user-1',
-    servicePrice: 35,
-    totalPrice: 1575,
-    createdBy: 'user-1',
-    createdAt: '2024-01-20T10:30:00Z'
-  },
-  {
-    id: 'job-003',
-    orderNumber: 'JO-2024-003',
-    customerId: 'cust-003',
-    customerName: 'City View Restaurant',
-    branchId: 'branch-1',
-    serviceType: 'wash_iron',
-    status: 'ironing',
-    weight: 65.0,
-    itemCount: 180,
-    receivedAt: '2024-01-22T08:00:00Z',
-    dueDate: '2024-01-25T17:00:00Z',
-    assignedTo: 'user-1',
-    servicePrice: 22,
-    totalPrice: 1430,
-    createdBy: 'user-1',
-    createdAt: '2024-01-22T08:00:00Z'
-  },
-  {
-    id: 'job-004',
-    orderNumber: 'JO-2024-004',
-    customerId: 'cust-005',
-    customerName: 'Spa & Wellness Center',
-    branchId: 'branch-2',
-    serviceType: 'wash_fold',
-    status: 'quality_check',
-    weight: 88.5,
-    itemCount: 250,
-    receivedAt: '2024-01-18T11:00:00Z',
-    dueDate: '2024-01-21T17:00:00Z',
-    assignedTo: 'user-2',
-    servicePrice: 18,
-    totalPrice: 1593,
-    createdBy: 'user-2',
-    createdAt: '2024-01-18T11:00:00Z'
-  },
-  {
-    id: 'job-005',
-    orderNumber: 'JO-2024-005',
-    customerId: 'cust-006',
-    customerName: 'Medical Clinic',
-    branchId: 'branch-2',
-    serviceType: 'dry_clean',
-    status: 'delivered',
-    weight: 32.0,
-    itemCount: 95,
-    receivedAt: '2024-01-12T09:30:00Z',
-    dueDate: '2024-01-15T17:00:00Z',
-    completedAt: '2024-01-15T15:00:00Z',
-    deliveredAt: '2024-01-15T16:30:00Z',
-    assignedTo: 'user-2',
-    servicePrice: 40,
-    totalPrice: 1280,
-    createdBy: 'user-2',
-    createdAt: '2024-01-12T09:30:00Z'
-  },
-  {
-    id: 'job-006',
-    orderNumber: 'JO-2024-006',
-    customerId: 'cust-007',
-    customerName: 'Fitness Gym',
-    branchId: 'branch-3',
-    serviceType: 'express',
-    status: 'drying',
-    weight: 55.0,
-    itemCount: 160,
-    receivedAt: '2024-01-24T13:00:00Z',
-    dueDate: '2024-01-25T17:00:00Z',
-    assignedTo: 'user-3',
-    servicePrice: 50,
-    totalPrice: 2750,
-    notes: 'Express service - needed by tomorrow',
-    createdBy: 'user-3',
-    createdAt: '2024-01-24T13:00:00Z'
-  },
-  {
-    id: 'job-007',
-    orderNumber: 'JO-2024-007',
-    customerId: 'cust-009',
-    customerName: 'Hotel Resort',
-    branchId: 'branch-3',
-    serviceType: 'wash_fold',
-    status: 'pending',
-    weight: 195.0,
-    itemCount: 580,
-    receivedAt: '2024-01-25T07:00:00Z',
-    dueDate: '2024-01-28T17:00:00Z',
-    assignedTo: 'user-3',
-    servicePrice: 14,
-    totalPrice: 2730,
-    createdBy: 'user-3',
-    createdAt: '2024-01-25T07:00:00Z'
-  },
-  {
-    id: 'job-008',
-    orderNumber: 'JO-2024-008',
-    customerId: 'cust-010',
-    customerName: 'Beauty Salon',
-    branchId: 'branch-1',
-    serviceType: 'iron_only',
-    status: 'in_progress',
-    weight: 18.5,
-    itemCount: 65,
-    receivedAt: '2024-01-26T10:00:00Z',
-    dueDate: '2024-01-27T17:00:00Z',
-    assignedTo: 'user-1',
-    servicePrice: 25,
-    totalPrice: 462.5,
-    createdBy: 'user-1',
-    createdAt: '2024-01-26T10:00:00Z'
-  }
+const STATUSES: JobOrderStatus[] = [
+  'pending', 'in_progress', 'washing', 'drying', 'ironing', 'quality_check', 'completed', 'delivered', 'cancelled',
 ]
+const SERVICE_TYPES: ServiceType[] = ['wash_fold', 'dry_clean', 'iron_only', 'wash_iron', 'express']
+
+const statusKey = (s: JobOrderStatus) =>
+  s === 'in_progress' ? 'inProgress' : s === 'quality_check' ? 'qualityCheck' : s
+const serviceKey = (s: ServiceType) =>
+  s === 'wash_fold' ? 'washFold' : s === 'dry_clean' ? 'dryClean' : s === 'iron_only' ? 'ironOnly' : s === 'wash_iron' ? 'washIron' : s
+
+function statusVariant(s: JobOrderStatus): 'default' | 'secondary' | 'outline' | 'destructive' {
+  if (s === 'completed' || s === 'delivered') return 'default'
+  if (s === 'cancelled') return 'destructive'
+  if (['washing', 'drying', 'ironing', 'quality_check'].includes(s)) return 'secondary'
+  return 'outline'
+}
+
+const emptyForm: JobOrderInput = {
+  customerId: '', branchId: '', serviceType: 'wash_fold',
+  weight: undefined, itemCount: undefined, dueDate: '', servicePrice: undefined,
+  additionalCharges: undefined, discount: undefined, notes: '',
+}
 
 export default function JobOrdersPage() {
   const t = useTranslations('operations')
-  const tCommon = useTranslations('common')
+  const tc = useTranslations('common')
   const { hasPermission } = useAuth()
   const user = useUser()
-  const { currentBranch } = useBranch()
+  const branchId = useCurrentBranchId()
+  const { availableBranches } = useBranch()
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('all')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const [orders, setOrders] = useState<JobOrder[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Filter job orders by branch access
-  const accessibleJobOrders = useMemo(() => {
-    if (!user) return []
-    return filterByBranchAccess(user, mockJobOrders)
-  }, [user])
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [serviceFilter, setServiceFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const perPage = 10
 
-  // Apply search and filters
-  const filteredJobOrders = useMemo(() => {
-    return accessibleJobOrders.filter(order => {
-      const matchesSearch =
-        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<JobOrderInput>(emptyForm)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter
-      const matchesServiceType = serviceTypeFilter === 'all' || order.serviceType === serviceTypeFilter
+  const load = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [o, c] = await Promise.all([fetchJobOrders(), fetchCustomers()])
+      setOrders(o)
+      setCustomers(c)
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : t('loadError'))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
 
-      return matchesSearch && matchesStatus && matchesServiceType
+  useEffect(() => { load() }, [load])
+
+  const customerName = (id: string) => customers.find((c) => c.id === id)?.name || id
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return orders.filter((o) => {
+      const name = o.customerName ?? customerName(o.customerId)
+      const matchSearch = !q || o.orderNumber.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+      const matchStatus = statusFilter === 'all' || o.status === statusFilter
+      const matchService = serviceFilter === 'all' || o.serviceType === serviceFilter
+      return matchSearch && matchStatus && matchService
     })
-  }, [accessibleJobOrders, searchQuery, statusFilter, serviceTypeFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, customers, search, statusFilter, serviceFilter])
 
-  // Calculate summary metrics
-  const summaryMetrics = useMemo(() => {
-    const total = filteredJobOrders.length
-    const active = filteredJobOrders.filter(order =>
-      !['completed', 'delivered', 'cancelled'].includes(order.status)
-    ).length
-    const pending = filteredJobOrders.filter(order => order.status === 'pending').length
-    const completed = filteredJobOrders.filter(order =>
-      ['completed', 'delivered'].includes(order.status)
-    ).length
+  const summary = useMemo(() => {
+    const active = filtered.filter((o) => !['completed', 'delivered', 'cancelled'].includes(o.status)).length
+    const pending = filtered.filter((o) => o.status === 'pending').length
+    const completed = filtered.filter((o) => ['completed', 'delivered'].includes(o.status)).length
+    return { total: filtered.length, active, pending, completed }
+  }, [filtered])
 
-    return {
-      totalOrders: total,
-      activeOrders: active,
-      pendingOrders: pending,
-      completedOrders: completed
-    }
-  }, [filteredJobOrders])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const pageItems = filtered.slice((page - 1) * perPage, page * perPage)
+  const branchCode = (id: string) => availableBranches.find((b) => b.id === id)?.code || id
 
-  // Pagination
-  const totalPages = Math.ceil(filteredJobOrders.length / itemsPerPage)
-  const paginatedJobOrders = filteredJobOrders.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const openCreate = () => {
+    setEditingId(null)
+    setForm({ ...emptyForm, branchId: branchId ?? '' })
+    setFormError(null)
+    setDialogOpen(true)
+  }
+  const openEdit = (o: JobOrder) => {
+    setEditingId(o.id)
+    setForm({
+      customerId: o.customerId, branchId: o.branchId, serviceType: o.serviceType,
+      weight: o.weight, itemCount: o.itemCount,
+      dueDate: o.dueDate ? o.dueDate.slice(0, 10) : '',
+      servicePrice: o.servicePrice, additionalCharges: o.additionalCharges,
+      discount: o.discount, notes: o.notes ?? '',
+    })
+    setFormError(null)
+    setDialogOpen(true)
+  }
+  const set = (k: keyof JobOrderInput, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
-  const getStatusBadgeVariant = (status: JobOrderStatus): "default" | "secondary" | "outline" | "destructive" => {
-    switch (status) {
-      case 'completed':
-      case 'delivered':
-        return 'default'
-      case 'washing':
-      case 'drying':
-      case 'ironing':
-      case 'quality_check':
-        return 'secondary'
-      case 'in_progress':
-        return 'outline'
-      case 'pending':
-        return 'outline'
-      case 'cancelled':
-        return 'destructive'
-      default:
-        return 'outline'
+  const numOrNull = (v: any) => (v === undefined || v === '' ? null : Number(v))
+
+  const save = async () => {
+    setFormError(null)
+    if (!form.customerId) { setFormError(t('customerRequired')); return }
+    if (!form.branchId) { setForm((f) => ({ ...f, branchId: branchId ?? '' })) }
+    setSaving(true)
+    try {
+      const payload: JobOrderInput = {
+        ...form,
+        branchId: form.branchId || (branchId ?? ''),
+        weight: numOrNull(form.weight) ?? 0,
+        itemCount: numOrNull(form.itemCount) ?? 0,
+        servicePrice: numOrNull(form.servicePrice) ?? 0,
+        additionalCharges: numOrNull(form.additionalCharges) ?? 0,
+        discount: numOrNull(form.discount) ?? 0,
+        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
+      }
+      if (editingId) await updateJobOrder(editingId, payload)
+      else await createJobOrder(payload)
+      setDialogOpen(false)
+      await load()
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t('saveError'))
+    } finally {
+      setSaving(false)
     }
   }
 
-  const getStatusIcon = (status: JobOrderStatus) => {
-    switch (status) {
-      case 'completed':
-      case 'delivered':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />
-      case 'pending':
-        return <Clock className="h-4 w-4 text-orange-500" />
-      case 'washing':
-      case 'drying':
-      case 'ironing':
-      case 'quality_check':
-      case 'in_progress':
-        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-      default:
-        return <FileText className="h-4 w-4" />
+  const changeStatus = async (o: JobOrder, status: JobOrderStatus) => {
+    try {
+      await updateJobOrderStatus(o.id, status)
+      await load()
+    } catch {
+      setLoadError(t('saveError'))
     }
   }
+
+  const cancel = async (o: JobOrder) => {
+    if (!confirm(t('confirmCancel', { number: o.orderNumber }))) return
+    try {
+      await cancelJobOrder(o.id)
+      await load()
+    } catch {
+      setLoadError(t('cancelError'))
+    }
+  }
+
+  const resetPage = () => setPage(1)
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 p-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('jobOrders')}</h1>
           <p className="text-muted-foreground">{t('subtitle')}</p>
         </div>
         {hasPermission('create') && (
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            {tCommon('create')} {t('jobOrder')}
+          <Button onClick={openCreate} disabled={customers.length === 0}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('createJobOrder')}
           </Button>
         )}
       </div>
 
-      {/* Summary Cards */}
+      {customers.length === 0 && !loading && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{t('noCustomers')}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Summary */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{tCommon('total')} {t('jobOrders')}</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summaryMetrics.totalOrders}</div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('all')} {t('jobOrders').toLowerCase()}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{tCommon('active')}</CardTitle>
-            <Loader2 className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {summaryMetrics.activeOrders}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('inProgress')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('jobStatus.pending')}</CardTitle>
-            <Clock className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {summaryMetrics.pendingOrders}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('waiting')}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{tCommon('completed')}</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {summaryMetrics.completedOrders}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {tCommon('finished')}
-            </p>
-          </CardContent>
-        </Card>
+        <SummaryCard label={`${tc('total')} ${t('jobOrders')}`} value={summary.total} icon={<FileText className="h-4 w-4 text-muted-foreground" />} />
+        <SummaryCard label={tc('active')} value={summary.active} icon={<Loader2 className="h-4 w-4 text-blue-500" />} valueClass="text-blue-600" />
+        <SummaryCard label={t('jobStatus.pending')} value={summary.pending} icon={<Clock className="h-4 w-4 text-orange-500" />} valueClass="text-orange-600" />
+        <SummaryCard label={t('jobStatus.completed')} value={summary.completed} icon={<CheckCircle2 className="h-4 w-4 text-green-500" />} valueClass="text-green-600" />
       </div>
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle>{tCommon('filters')}</CardTitle>
-          <CardDescription>{tCommon('filterDescription')}</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>{tc('filters')}</CardTitle></CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{tCommon('search')}</label>
-              <Input
-                placeholder={`${tCommon('searchBy')} ${t('orderNumber')} ${tCommon('or')} ${tCommon('customer')}`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{tCommon('status')}</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{tCommon('all')}</SelectItem>
-                  <SelectItem value="pending">{t('jobStatus.pending')}</SelectItem>
-                  <SelectItem value="in_progress">{t('jobStatus.inProgress')}</SelectItem>
-                  <SelectItem value="washing">{t('jobStatus.washing')}</SelectItem>
-                  <SelectItem value="drying">{t('jobStatus.drying')}</SelectItem>
-                  <SelectItem value="ironing">{t('jobStatus.ironing')}</SelectItem>
-                  <SelectItem value="quality_check">{t('jobStatus.qualityCheck')}</SelectItem>
-                  <SelectItem value="completed">{t('jobStatus.completed')}</SelectItem>
-                  <SelectItem value="delivered">{t('jobStatus.delivered')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('serviceType')}</label>
-              <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{tCommon('all')}</SelectItem>
-                  <SelectItem value="wash_fold">{t('serviceTypes.washFold')}</SelectItem>
-                  <SelectItem value="dry_clean">{t('serviceTypes.dryClean')}</SelectItem>
-                  <SelectItem value="iron_only">{t('serviceTypes.ironOnly')}</SelectItem>
-                  <SelectItem value="wash_iron">{t('serviceTypes.washIron')}</SelectItem>
-                  <SelectItem value="express">{t('serviceTypes.express')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Input placeholder={tc('searchPlaceholder')} value={search}
+              onChange={(e) => { setSearch(e.target.value); resetPage() }} />
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); resetPage() }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{tc('all')}</SelectItem>
+                {STATUSES.map((s) => <SelectItem key={s} value={s}>{t(`jobStatus.${statusKey(s)}`)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={serviceFilter} onValueChange={(v) => { setServiceFilter(v); resetPage() }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{tc('all')}</SelectItem>
+                {SERVICE_TYPES.map((s) => <SelectItem key={s} value={s}>{t(`serviceTypes.${serviceKey(s)}`)}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Job Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('jobOrders')} {tCommon('list')}</CardTitle>
-          <CardDescription>
-            {tCommon('showing')} {paginatedJobOrders.length} {tCommon('of')} {filteredJobOrders.length} {t('jobOrders').toLowerCase()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('orderNumber')}</TableHead>
-                <TableHead>{tCommon('customer')}</TableHead>
-                <TableHead>{t('serviceType')}</TableHead>
-                <TableHead>{t('weight')}</TableHead>
-                <TableHead>{t('itemCount')}</TableHead>
-                <TableHead>{t('receivedAt')}</TableHead>
-                <TableHead>{t('dueDate')}</TableHead>
-                <TableHead>{tCommon('price')}</TableHead>
-                <TableHead>{tCommon('status')}</TableHead>
-                {user?.role !== 'user' && <TableHead>{tCommon('branch')}</TableHead>}
-                <TableHead className="text-right">{tCommon('actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedJobOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground">
-                    {tCommon('noData')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedJobOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                    <TableCell>{order.customerName}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {t(`serviceTypes.${order.serviceType === 'wash_fold' ? 'washFold' : order.serviceType === 'dry_clean' ? 'dryClean' : order.serviceType === 'iron_only' ? 'ironOnly' : order.serviceType === 'wash_iron' ? 'washIron' : order.serviceType}` as any)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{order.weight} kg</TableCell>
-                    <TableCell>
-                      <span className="flex items-center gap-1">
-                        <Package className="h-3 w-3" />
-                        {order.itemCount}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(order.receivedAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(order.dueDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      ฿{order.totalPrice.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(order.status)}
-                        <Badge variant={getStatusBadgeVariant(order.status)}>
-                          {t(`jobStatus.${order.status === 'in_progress' ? 'inProgress' : order.status === 'quality_check' ? 'qualityCheck' : order.status}` as any)}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    {user?.role !== 'user' && (
-                      <TableCell>
-                        <Badge variant="outline">
-                          {order.branchId === 'branch-1' ? 'BKK01' :
-                           order.branchId === 'branch-2' ? 'CNX01' : 'HKT01'}
-                        </Badge>
-                      </TableCell>
-                    )}
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" title={tCommon('view')}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {hasPermission('update') && (
-                          <Button variant="ghost" size="icon" title={tCommon('edit')}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {hasPermission('delete') && (
-                          <Button variant="ghost" size="icon" title={tCommon('delete')}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      {loadError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
+      {/* Table */}
+      <Card>
+        <CardHeader><CardTitle>{t('jobOrders')}</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('orderNumber')}</TableHead>
+                  <TableHead>{tc('customer')}</TableHead>
+                  <TableHead>{t('serviceType')}</TableHead>
+                  <TableHead className="text-right">{t('weight')}</TableHead>
+                  <TableHead className="text-right">{t('itemCount')}</TableHead>
+                  <TableHead>{t('dueDate')}</TableHead>
+                  <TableHead className="text-right">{t('totalPrice')}</TableHead>
+                  <TableHead className="w-[150px]">{tc('status')}</TableHead>
+                  {user?.role !== 'user' && <TableHead>{tc('branch')}</TableHead>}
+                  <TableHead className="text-right">{tc('actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={10} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
+                ) : pageItems.length === 0 ? (
+                  <TableRow><TableCell colSpan={10} className="py-10 text-center text-muted-foreground">{t('empty')}</TableCell></TableRow>
+                ) : (
+                  pageItems.map((o) => (
+                    <TableRow key={o.id}>
+                      <TableCell className="font-mono font-medium">{o.orderNumber}</TableCell>
+                      <TableCell>{o.customerName ?? customerName(o.customerId)}</TableCell>
+                      <TableCell><Badge variant="outline">{t(`serviceTypes.${serviceKey(o.serviceType)}`)}</Badge></TableCell>
+                      <TableCell className="text-right">{o.weight} kg</TableCell>
+                      <TableCell className="text-right">
+                        <span className="inline-flex items-center gap-1"><Package className="h-3 w-3" />{o.itemCount}</span>
+                      </TableCell>
+                      <TableCell>{o.dueDate ? new Date(o.dueDate).toLocaleDateString() : '—'}</TableCell>
+                      <TableCell className="text-right font-semibold">฿{o.totalPrice.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {hasPermission('update') && o.status !== 'cancelled' ? (
+                          <Select value={o.status} onValueChange={(v) => changeStatus(o, v as JobOrderStatus)}>
+                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {STATUSES.map((s) => <SelectItem key={s} value={s}>{t(`jobStatus.${statusKey(s)}`)}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant={statusVariant(o.status)}>{t(`jobStatus.${statusKey(o.status)}`)}</Badge>
+                        )}
+                      </TableCell>
+                      {user?.role !== 'user' && <TableCell><Badge variant="outline">{branchCode(o.branchId)}</Badge></TableCell>}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {hasPermission('update') && (
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(o)} title={tc('edit')}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {hasPermission('delete') && o.status !== 'cancelled' && (
+                            <Button variant="ghost" size="icon" onClick={() => cancel(o)} title={t('cancelOrder')}>
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {filtered.length > perPage && (
+            <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {tCommon('page')} {currentPage} {tCommon('of')} {totalPages}
+                {tc('showing')} {pageItems.length} {tc('of')} {filtered.length}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  {tCommon('previous')}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  {tCommon('next')}
-                </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>{tc('previous')}</Button>
+                <span className="px-2 text-sm">{tc('page')} {page} {tc('of')} {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>{tc('next')}</Button>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Create / Edit dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader><DialogTitle>{editingId ? t('editJobOrder') : t('createJobOrder')}</DialogTitle></DialogHeader>
+
+          {formError && (
+            <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{formError}</AlertDescription></Alert>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{tc('customer')} *</Label>
+              <Select value={form.customerId} onValueChange={(v) => set('customerId', v)}>
+                <SelectTrigger><SelectValue placeholder={t('selectCustomer')} /></SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('serviceType')}</Label>
+              <Select value={form.serviceType} onValueChange={(v) => set('serviceType', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SERVICE_TYPES.map((s) => <SelectItem key={s} value={s}>{t(`serviceTypes.${serviceKey(s)}`)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('dueDate')}</Label>
+              <Input type="date" value={form.dueDate ?? ''} onChange={(e) => set('dueDate', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('weightKg')}</Label>
+              <Input type="number" min="0" step="0.1" value={form.weight ?? ''} onChange={(e) => set('weight', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('itemCount')}</Label>
+              <Input type="number" min="0" value={form.itemCount ?? ''} onChange={(e) => set('itemCount', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('servicePrice')}</Label>
+              <Input type="number" min="0" step="0.01" value={form.servicePrice ?? ''} onChange={(e) => set('servicePrice', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('additionalCharges')}</Label>
+              <Input type="number" min="0" step="0.01" value={form.additionalCharges ?? ''} onChange={(e) => set('additionalCharges', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('discount')}</Label>
+              <Input type="number" min="0" step="0.01" value={form.discount ?? ''} onChange={(e) => set('discount', e.target.value)} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t('notes')}</Label>
+              <Input value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>{tc('cancel')}</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{tc('save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  )
+}
+
+function SummaryCard({ label, value, icon, valueClass }: { label: string; value: React.ReactNode; icon: React.ReactNode; valueClass?: string }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{label}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent><div className={`text-2xl font-bold ${valueClass ?? ''}`}>{value}</div></CardContent>
+    </Card>
   )
 }

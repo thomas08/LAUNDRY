@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/change-password/RBAC via `/v1/auth/*`). **Linen Articles, Customers, Inventory list, linen registration, and account/password** are also backend-wired (`/v1/articles`, `/v1/customers`, `/v1/linen-items`, `/v1/sync/batch`). The remaining business **data pages (Job Orders, Finance, consumable Stock, Suppliers, Reports) still render from mock data** pending their backend endpoints.
+This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/change-password/RBAC via `/v1/auth/*`). **Linen Articles, Customers, Inventory list, Job Orders, Finance (expenses/invoices), Suppliers, consumable Stock, Reports, linen registration, and account/password** are all backend-wired (`/v1/articles`, `/v1/customers`, `/v1/linen-items`, `/v1/job-orders`, `/v1/expenses`, `/v1/invoices`, `/v1/suppliers`, `/v1/inventory-items`, `/v1/reports`, `/v1/sync/batch`). All business data pages now render from the real backend; only `checkin` and `ai-scanner` remain on mock data.
 
 ## Development Commands
 
@@ -23,7 +23,7 @@ This is a **two-part repo**: the Next.js frontend lives at the root, and a stand
 
 **Deployment**: See `DEPLOYMENT.md`. `docker-compose.prod.yml` builds all three containers; the backend runs migrations on start. Both apps have Dockerfiles (frontend uses Next.js `output: 'standalone'`). The frontend requires `npm ci --legacy-peer-deps` (some Radix/vaul peers lag React 19).
 
-There is no test framework in either project (`backend` `npm test` is a placeholder that exits 1).
+**Testing**: both projects use **Vitest**. Frontend: `pnpm test` (root `vitest.config.ts`, resolves `@/`) runs `lib/api/*.test.ts` (api modules test request shape + `normalize` numeric coercion by mocking `apiFetch`). Backend: `cd backend && npm test` runs pure-logic unit tests (`*.test.ts` next to source, e.g. stock arithmetic `applyStockMovement`, report `resolvePeriodRange`/`pctChange`). No DB is required for the current tests; there is no E2E harness yet.
 
 ## Architecture Overview
 
@@ -404,6 +404,12 @@ Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refr
 - `GET/POST /v1/articles`, `GET/PUT/DELETE /v1/articles/:id` — Linen Article (SKU master) CRUD (`ArticleModel`); DELETE is a soft-delete (`is_active=false`). RBAC: read/create/update/delete.
 - `GET/POST /v1/customers`, `GET/PUT/DELETE /v1/customers/:id` — Customer CRUD (`CustomerModel`, migration 004). Branch-scoped in the controller via `utils/branchScope.ts` (superadmin=all, admin=`branchIds`, user=primary). Soft-delete.
 - `GET /v1/linen-items?status=&ownership=` — read-only linen inventory list (`LinenItemModel`), branch-scoped, LEFT JOINs `linen_articles` (articleName) + `customers` (customerName). Items are written only via the sync pipeline.
+- `GET/POST /v1/job-orders`, `GET/PUT/DELETE /v1/job-orders/:id`, `PATCH /v1/job-orders/:id/status` — Job Order CRUD (`JobOrderModel`, migration 005). Branch-scoped; `order_number` from a sequence (`JO-YYYY-NNNN`); `total_price` computed server-side (`servicePrice*weight + additionalCharges − discount`); status change auto-sets completed_at/delivered_at; DELETE = cancel (status `cancelled`). FK `customer_id → customers(id)`.
+- `GET/POST /v1/expenses`, `PUT/DELETE /v1/expenses/:id` — Expense CRUD (`ExpenseModel`, migration 006). Branch-scoped; `total_amount = amount + vatAmount` server-side; `expense_number` `EXP-YYYY-NNNN`; DELETE is a **hard** delete.
+- `GET/POST /v1/invoices`, `GET/PUT/DELETE /v1/invoices/:id`, `PATCH /v1/invoices/:id/payment`, `PATCH /v1/invoices/:id/status` — Invoice CRUD (`InvoiceModel`, migration 006). `subtotal` = SUM of linked non-cancelled job_orders' `total_price`; `vat`/`total` server-side; `recordPayment` adjusts paid/remaining + status; DELETE = cancel.
+- `GET/POST /v1/suppliers`, `GET/PUT/DELETE /v1/suppliers/:id` — Supplier CRUD (`SupplierModel`, migration 007). **Org-global** (no branch scoping — RBAC by permission only); `code` `SUP-NNNN` from a sequence; soft-delete. Migration 007 also adds the `expenses.supplier_id → suppliers(id)` FK.
+- `GET/POST /v1/inventory-items`, `GET/PUT/DELETE /v1/inventory-items/:id`, `GET/POST /v1/inventory-items/:id/transactions` — Consumable Stock (`InventoryItemModel`, migration 008: `inventory_items` + `stock_transactions`). Branch-scoped; `code` `INV-NNNN`; `current_stock` changes **only** via the transactions POST (atomic `SELECT FOR UPDATE` + ledger insert + stock update in one `transaction()`); `applyStockMovement` is a pure exported fn (stock_in/return add, stock_out/adjustment subtract + reject-negative, transfer 400 in v1); low-stock `alertLevel` derived at read time; FK `supplier_id → suppliers(id)`.
+- `GET /v1/reports/summary`, `GET /v1/reports/sales-by-service`, `GET /v1/reports/cost-by-category` — read-only aggregates (`ReportModel`, no new tables), branch-scoped, RBAC `view_reports`. Pure `resolvePeriodRange`/`pctChange` in `utils/reportPeriod.ts`.
 - `POST /v1/sync/batch` — handheld RFID devices upload a batch of offline-collected scan events. Registration (single or batch) is `item_receive` events here; `payload.articleId`/`payload.ownership` link the item to an Article and set rental/COG.
 - `GET /v1/sync/reference?branchId=...` — reference data for devices to cache for offline use
 
@@ -436,12 +442,25 @@ a placeholder pending the operations backend). The **Inventory** page (`/invento
 `lib/api/linen-items.ts`) is a real read-only list with status/ownership filters and canonical
 statuses (`In Stock`/`Washing`/`On-Rent`). Branch scoping is enforced server-side.
 
-### Not done — Remaining business data endpoints
-Job Orders, Finance (expenses/invoices), consumable Stock, Suppliers, and Reports pages still read
-mock data. The backend has **no endpoints** for these yet — build the modules first (routes →
-controllers → models, mirroring `auth`/`sync`/`articles`/`customers`).
+### Done — Job Orders
+Real, backend-wired: the **Job Orders** page (`/operations/job-orders`, `lib/api/job-orders.ts`)
+lists/creates/edits orders (customer picker, service type, weight/pricing), changes status inline,
+and cancels. The customer detail page (`/customers/[id]`) now shows that customer's job-order history
+from the API.
 
-### Integration Pattern (for the data modules, when built)
+### Done — Finance, Suppliers, Consumable Stock, Reports
+All backend-wired (built with the Architect→Implementer→Tester subagent pipeline, see the
+agent-team-workflow memory). **Finance** — `/finance/expenses` + `/finance/invoices`
+(`lib/api/expenses.ts`, `invoices.ts`; pure helpers in `lib/finance/helpers.tsx`; note
+`vatRate` is a fraction like `0.07`, not a percent). **Suppliers** — `/inventory/suppliers`
+(`lib/api/suppliers.ts`; org-global, `code` server-assigned). **Consumable Stock** —
+`/inventory/stock` (`lib/api/inventory-items.ts`; movement dialog posts to `/:id/transactions`,
+never edits `current_stock` via PUT; badges/KPIs use the server `alertLevel`). **Reports** —
+`/reports` (`lib/api/reports.ts`; period `<Select>`, null %-change renders as em-dash, one
+recharts sales-by-service bar). All follow the plain `useEffect` fetch + inline `<Alert>` pattern
+(no SWR/toaster). Remaining mock pages: `checkin`, `ai-scanner`.
+
+### Integration Pattern (reference)
 
 1. **Add a data API module** in `lib/api/` using the existing `apiFetch` client
    (it already attaches the Bearer token and handles refresh):

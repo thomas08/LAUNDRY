@@ -4,25 +4,34 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useRouter } from '@/lib/navigation'
 import { useTranslations } from 'next-intl'
-import type { Customer } from '@/lib/types'
+import type { Customer, JobOrder, JobOrderStatus, ServiceType } from '@/lib/types'
 import { fetchCustomer } from '@/lib/api/customers'
+import { fetchJobOrders } from '@/lib/api/job-orders'
 import { ApiError } from '@/lib/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Mail, Phone, MapPin, Calendar, ArrowLeft, AlertTriangle, Building2, CreditCard, Loader2,
 } from 'lucide-react'
+
+const statusKey = (s: JobOrderStatus) =>
+  s === 'in_progress' ? 'inProgress' : s === 'quality_check' ? 'qualityCheck' : s
+const serviceKey = (s: ServiceType) =>
+  s === 'wash_fold' ? 'washFold' : s === 'dry_clean' ? 'dryClean' : s === 'iron_only' ? 'ironOnly' : s === 'wash_iron' ? 'washIron' : s
 
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
   const t = useTranslations('customers')
   const tc = useTranslations('common')
+  const tOps = useTranslations('operations')
   const customerId = params.id as string
 
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
 
@@ -30,7 +39,12 @@ export default function CustomerDetailPage() {
     let cancelled = false
     setLoading(true)
     fetchCustomer(customerId)
-      .then((c) => { if (!cancelled) setCustomer(c) })
+      .then((c) => {
+        if (cancelled) return
+        setCustomer(c)
+        // load this customer's job orders (best-effort; ignore failures)
+        fetchJobOrders({ customerId }).then((o) => { if (!cancelled) setJobOrders(o) }).catch(() => {})
+      })
       .catch((err) => { if (!cancelled) setErrorStatus(err instanceof ApiError ? err.status : 500) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -176,10 +190,37 @@ export default function CustomerDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-                <CreditCard className="mb-3 h-8 w-8 opacity-50" />
-                <p>{t('jobOrdersComingSoon')}</p>
-              </div>
+              {jobOrders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+                  <CreditCard className="mb-3 h-8 w-8 opacity-50" />
+                  <p>{tc('noData')}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{tOps('orderNumber')}</TableHead>
+                        <TableHead>{tOps('serviceType')}</TableHead>
+                        <TableHead>{tOps('dueDate')}</TableHead>
+                        <TableHead className="text-right">{tOps('totalPrice')}</TableHead>
+                        <TableHead>{tc('status')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {jobOrders.map((o) => (
+                        <TableRow key={o.id}>
+                          <TableCell className="font-mono text-sm">{o.orderNumber}</TableCell>
+                          <TableCell><Badge variant="outline">{tOps(`serviceTypes.${serviceKey(o.serviceType)}`)}</Badge></TableCell>
+                          <TableCell>{o.dueDate ? new Date(o.dueDate).toLocaleDateString() : '—'}</TableCell>
+                          <TableCell className="text-right font-medium">฿{o.totalPrice.toLocaleString()}</TableCell>
+                          <TableCell><Badge variant="outline">{tOps(`jobStatus.${statusKey(o.status)}`)}</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

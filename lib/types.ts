@@ -355,6 +355,7 @@ export interface JobOrder {
   id: string
   orderNumber: string       // เลขที่ใบสั่งงาน เช่น "JO-2024-0001"
   customerId: string
+  customerName?: string     // จาก JOIN customers (read-only, มาจาก API)
   branchId: string
   serviceType: ServiceType
   status: JobOrderStatus
@@ -377,6 +378,7 @@ export interface JobOrder {
 
   // References
   assignedTo?: string       // User ID ผู้รับผิดชอบ
+  createdBy?: string        // User ID ผู้สร้าง
   notes?: string
 
   createdAt: string

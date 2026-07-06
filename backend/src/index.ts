@@ -7,6 +7,12 @@ import syncRoutes from './routes/sync';
 import articleRoutes from './routes/articles';
 import customerRoutes from './routes/customers';
 import linenItemRoutes from './routes/linenItems';
+import jobOrderRoutes from './routes/jobOrders';
+import expenseRoutes from './routes/expenses';
+import invoiceRoutes from './routes/invoices';
+import supplierRoutes from './routes/suppliers';
+import inventoryItemRoutes from './routes/inventoryItems';
+import reportRoutes from './routes/reports';
 
 const app = express();
 
@@ -39,6 +45,12 @@ app.use('/v1/sync', syncRoutes);
 app.use('/v1/articles', articleRoutes);
 app.use('/v1/customers', customerRoutes);
 app.use('/v1/linen-items', linenItemRoutes);
+app.use('/v1/job-orders', jobOrderRoutes);
+app.use('/v1/expenses', expenseRoutes);
+app.use('/v1/invoices', invoiceRoutes);
+app.use('/v1/suppliers', supplierRoutes);
+app.use('/v1/inventory-items', inventoryItemRoutes);
+app.use('/v1/reports', reportRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
@@ -90,6 +102,12 @@ async function startServer() {
 ║   GET    /v1/articles        - List linen articles       ║
 ║   GET    /v1/customers       - List customers            ║
 ║   GET    /v1/linen-items     - List linen inventory      ║
+║   GET    /v1/job-orders      - List/create job orders    ║
+║   GET    /v1/expenses        - List/create expenses      ║
+║   GET    /v1/invoices        - List/create invoices      ║
+║   GET    /v1/suppliers       - List/create suppliers     ║
+║   GET    /v1/inventory-items - Consumable stock + moves   ║
+║   GET    /v1/reports/summary - Analytics aggregates      ║
 ║   POST   /v1/sync/batch      - Batch sync scan events    ║
 ║   GET    /v1/sync/reference  - Get offline reference data║
 ║                                                           ║

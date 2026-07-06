@@ -1,9 +1,17 @@
 'use client'
 
 import { useTranslations } from "next-intl"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Supplier } from "@/lib/types"
 import { useAuth } from "@/contexts/AuthContext"
+import {
+  fetchSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+  type SupplierInput,
+} from "@/lib/api/suppliers"
+import { ApiError } from "@/lib/api/client"
 import {
   Table,
   TableBody,
@@ -13,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -23,131 +32,91 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
   Search,
   Plus,
-  Eye,
   Edit,
   Trash2,
   Building2,
   Mail,
   Phone,
   MapPin,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react"
+
+const emptyForm: SupplierInput = {
+  name: '',
+  nameTh: '',
+  nameEn: '',
+  contactPerson: '',
+  email: '',
+  phone: '',
+  address: '',
+  taxId: '',
+  paymentTerms: undefined,
+}
 
 export default function SuppliersPage() {
   const t = useTranslations('suppliers')
   const tCommon = useTranslations('common')
-  const { user, hasPermission } = useAuth()
+  const { hasPermission } = useAuth()
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // Mock data - Will be replaced with API calls
-  const mockSuppliers: Supplier[] = [
-    {
-      id: "sup-001",
-      code: "SUP-001",
-      name: "Prima Plus Co., Ltd.",
-      nameTh: "บริษัท พรีมา พลัส จำกัด",
-      nameEn: "Prima Plus Co., Ltd.",
-      contactPerson: "คุณสมชาย วงศ์สุวรรณ",
-      email: "sales@primaplus.co.th",
-      phone: "+66-2-555-1234",
-      address: "123 ถนนพระราม 4 แขวงพระโขนง เขตคลองเตย กรุงเทพฯ 10110",
-      taxId: "0105558123456",
-      paymentTerms: 30,
-      isActive: true,
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-01-15T10:30:00Z"
-    },
-    {
-      id: "sup-002",
-      code: "SUP-002",
-      name: "ChemClean Solutions",
-      nameTh: "เคมคลีน โซลูชั่น",
-      nameEn: "ChemClean Solutions",
-      contactPerson: "Ms. Sunisa Tanaka",
-      email: "contact@chemclean.com",
-      phone: "+66-2-666-5678",
-      address: "456 Sukhumvit Road, Bangkok 10110",
-      taxId: "0105559234567",
-      paymentTerms: 45,
-      isActive: true,
-      createdAt: "2024-01-05T00:00:00Z",
-      updatedAt: "2024-01-20T14:20:00Z"
-    },
-    {
-      id: "sup-003",
-      code: "SUP-003",
-      name: "Thai Packaging Industry",
-      nameTh: "ไทยแพ็คเกจจิ้ง อินดัสทรี",
-      nameEn: "Thai Packaging Industry",
-      contactPerson: "Mr. Wichai Mongkol",
-      email: "info@thaipack.co.th",
-      phone: "+66-2-777-9012",
-      address: "789 Rama 9 Road, Bangkok 10320",
-      taxId: "0105560345678",
-      paymentTerms: 30,
-      isActive: true,
-      createdAt: "2024-01-10T00:00:00Z",
-      updatedAt: "2024-01-25T09:15:00Z"
-    },
-    {
-      id: "sup-004",
-      code: "SUP-004",
-      name: "PTT LPG Distribution",
-      nameTh: "พีทีที แอลพีจี",
-      nameEn: "PTT LPG Distribution",
-      contactPerson: "Ms. Kanokwan Srisai",
-      email: "service@pttlpg.com",
-      phone: "+66-2-888-3456",
-      address: "555 Energy Complex, Bangkok 10900",
-      taxId: "0105561456789",
-      paymentTerms: 15,
-      isActive: true,
-      createdAt: "2024-01-12T00:00:00Z",
-      updatedAt: "2024-01-28T11:40:00Z"
-    },
-    {
-      id: "sup-005",
-      code: "SUP-005",
-      name: "Global Hanger Manufacturing",
-      nameTh: "โกลบอล แฮงเกอร์ แมนูแฟคเจอริ่ง",
-      nameEn: "Global Hanger Manufacturing",
-      contactPerson: "Mr. Somchai Prasert",
-      email: "sales@globalhanger.com",
-      phone: "+66-2-999-7890",
-      address: "321 Industrial Estate, Samut Prakan 10280",
-      taxId: "0105562567890",
-      paymentTerms: 60,
-      isActive: true,
-      createdAt: "2024-01-18T00:00:00Z",
-      updatedAt: "2024-02-01T16:20:00Z"
-    },
-    {
-      id: "sup-006",
-      code: "SUP-006",
-      name: "Eco Bleach Solutions (Inactive)",
-      nameTh: "อีโค บลีช โซลูชั่น (ไม่ใช้งาน)",
-      nameEn: "Eco Bleach Solutions (Inactive)",
-      contactPerson: "Mr. Prasit Khamwan",
-      email: "old@ecobleach.com",
-      phone: "+66-2-111-2222",
-      address: "999 Old Street, Bangkok 10400",
-      taxId: "0105563678901",
-      paymentTerms: 30,
-      isActive: false,
-      createdAt: "2023-06-01T00:00:00Z",
-      updatedAt: "2023-12-31T23:59:00Z"
-    },
-  ]
+  // Create / edit dialog
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<Supplier | null>(null)
+  const [form, setForm] = useState<SupplierInput>(emptyForm)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  // Filter suppliers
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      setSuppliers(await fetchSuppliers())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('loadError'))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => { load() }, [load])
+
+  // Filter suppliers (client-side search)
   const filteredSuppliers = useMemo(() => {
-    let result = mockSuppliers
-
-    // Search filter
+    let result = suppliers
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       result = result.filter(
@@ -161,12 +130,8 @@ export default function SuppliersPage() {
           supplier.nameEn?.toLowerCase().includes(query)
       )
     }
-
-    // Filter out inactive suppliers by default
-    result = result.filter((s) => s.isActive)
-
     return result
-  }, [searchQuery])
+  }, [suppliers, searchQuery])
 
   // Pagination
   const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage)
@@ -175,24 +140,95 @@ export default function SuppliersPage() {
     return filteredSuppliers.slice(startIndex, startIndex + itemsPerPage)
   }, [filteredSuppliers, currentPage])
 
-  // Reset to page 1 when filters change
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
     setCurrentPage(1)
   }
 
-  // Calculate metrics
+  // Metrics (fetchSuppliers returns active-only, so all loaded suppliers are active)
   const metrics = useMemo(() => {
-    const totalSuppliers = mockSuppliers.filter((s) => s.isActive).length
-    const inactiveSuppliers = mockSuppliers.filter((s) => !s.isActive).length
-    const avgPaymentTerms = Math.round(
-      mockSuppliers
-        .filter((s) => s.isActive)
-        .reduce((sum, s) => sum + (s.paymentTerms || 0), 0) / totalSuppliers
-    )
+    const totalSuppliers = suppliers.length
+    const avgPaymentTerms = totalSuppliers
+      ? Math.round(
+          suppliers.reduce((sum, s) => sum + (s.paymentTerms || 0), 0) / totalSuppliers
+        )
+      : 0
+    return { totalSuppliers, inactiveSuppliers: 0, avgPaymentTerms }
+  }, [suppliers])
 
-    return { totalSuppliers, inactiveSuppliers, avgPaymentTerms }
-  }, [])
+  const setField = (k: keyof SupplierInput, v: any) => setForm((f) => ({ ...f, [k]: v }))
+
+  const openCreate = () => {
+    setEditing(null)
+    setForm(emptyForm)
+    setFormError(null)
+    setDialogOpen(true)
+  }
+
+  const openEdit = (s: Supplier) => {
+    setEditing(s)
+    setForm({
+      name: s.name,
+      nameTh: s.nameTh ?? '',
+      nameEn: s.nameEn ?? '',
+      contactPerson: s.contactPerson ?? '',
+      email: s.email ?? '',
+      phone: s.phone ?? '',
+      address: s.address ?? '',
+      taxId: s.taxId ?? '',
+      paymentTerms: s.paymentTerms,
+    })
+    setFormError(null)
+    setDialogOpen(true)
+  }
+
+  const save = async () => {
+    setFormError(null)
+    if (!form.name || !form.name.trim()) {
+      setFormError(t('formNameRequired'))
+      return
+    }
+    setSaving(true)
+    try {
+      const payload: SupplierInput = {
+        ...form,
+        name: form.name.trim(),
+        paymentTerms:
+          form.paymentTerms === undefined || (form.paymentTerms as any) === ''
+            ? null
+            : Number(form.paymentTerms),
+      }
+      if (editing) {
+        await updateSupplier(editing.id, payload)
+        setSuccess(t('updateSuccess'))
+      } else {
+        await createSupplier(payload)
+        setSuccess(t('createSuccess'))
+      }
+      setDialogOpen(false)
+      await load()
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : t('saveError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteSupplier(deleteTarget.id)
+      setSuccess(t('deleteSuccess'))
+      setDeleteTarget(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('deleteError'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen p-8">
@@ -203,12 +239,26 @@ export default function SuppliersPage() {
         </div>
 
         {hasPermission('create') && (
-          <Button>
+          <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
             {t('addSupplier')}
           </Button>
         )}
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="mb-6">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3 mb-8">
@@ -289,7 +339,14 @@ export default function SuppliersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedSuppliers.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-10">
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                  <div className="mt-2 text-sm text-muted-foreground">{t('loading')}</div>
+                </TableCell>
+              </TableRow>
+            ) : paginatedSuppliers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   {searchQuery ? t('noMatchingSuppliers') : t('noSuppliersFound')}
@@ -309,25 +366,33 @@ export default function SuppliersPage() {
                   </TableCell>
                   <TableCell>{supplier.contactPerson}</TableCell>
                   <TableCell>
-                    <a
-                      href={`mailto:${supplier.email}`}
-                      className="text-primary hover:underline flex items-center gap-1"
-                    >
-                      <Mail className="h-3 w-3" />
-                      {supplier.email}
-                    </a>
+                    {supplier.email ? (
+                      <a
+                        href={`mailto:${supplier.email}`}
+                        className="text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Mail className="h-3 w-3" />
+                        {supplier.email}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <a
-                      href={`tel:${supplier.phone}`}
-                      className="text-primary hover:underline flex items-center gap-1"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {supplier.phone}
-                    </a>
+                    {supplier.phone ? (
+                      <a
+                        href={`tel:${supplier.phone}`}
+                        className="text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Phone className="h-3 w-3" />
+                        {supplier.phone}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge variant="outline">{supplier.paymentTerms} {t('days')}</Badge>
+                    <Badge variant="outline">{supplier.paymentTerms ?? 0} {t('days')}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={supplier.isActive ? "default" : "secondary"}>
@@ -336,21 +401,26 @@ export default function SuppliersPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      {/* View Button */}
-                      <Button variant="ghost" size="icon" title={t('viewDetails')}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-
                       {/* Edit Button */}
                       {hasPermission('update') && (
-                        <Button variant="ghost" size="icon" title={t('editSupplier')}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title={t('editSupplier')}
+                          onClick={() => openEdit(supplier)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                       )}
 
                       {/* Delete Button */}
                       {hasPermission('delete') && (
-                        <Button variant="ghost" size="icon" title={tCommon('delete')}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title={tCommon('delete')}
+                          onClick={() => setDeleteTarget(supplier)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       )}
@@ -424,6 +494,101 @@ export default function SuppliersPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Create / Edit dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? t('editSupplier') : t('addSupplier')}</DialogTitle>
+          </DialogHeader>
+
+          {formError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {editing && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>{t('supplierCode')}</Label>
+                <Input value={editing.code} readOnly disabled className="font-mono" />
+              </div>
+            )}
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t('supplierName')} *</Label>
+              <Input value={form.name} onChange={(e) => setField('name', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('nameTh')}</Label>
+              <Input value={form.nameTh ?? ''} onChange={(e) => setField('nameTh', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('nameEn')}</Label>
+              <Input value={form.nameEn ?? ''} onChange={(e) => setField('nameEn', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('contactPerson')}</Label>
+              <Input value={form.contactPerson ?? ''} onChange={(e) => setField('contactPerson', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('email')}</Label>
+              <Input type="email" value={form.email ?? ''} onChange={(e) => setField('email', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('phone')}</Label>
+              <Input value={form.phone ?? ''} onChange={(e) => setField('phone', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('paymentTerms')}</Label>
+              <Input
+                type="number"
+                min="0"
+                value={form.paymentTerms ?? ''}
+                onChange={(e) => setField('paymentTerms', e.target.value === '' ? undefined : e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t('address')}</Label>
+              <Input value={form.address ?? ''} onChange={(e) => setField('address', e.target.value)} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>{t('taxId')}</Label>
+              <Input value={form.taxId ?? ''} onChange={(e) => setField('taxId', e.target.value)} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+              {t('cancel')}
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t('save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteConfirm')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? `${deleteTarget.code} — ${deleteTarget.name}` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDelete() }} disabled={deleting}>
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {tCommon('delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
