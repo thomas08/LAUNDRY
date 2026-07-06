@@ -1,0 +1,361 @@
+<style>
+  :root {
+    --bg: #FBFCFC;
+    --surface: #FFFFFF;
+    --surface-2: #F3F7F6;
+    --text: #16302E;
+    --muted: #5A6B69;
+    --border: #E2E8E7;
+    --primary: #0F766E;
+    --primary-soft: #E5F1EF;
+    --ok: #15803D;
+    --warn: #B45309;
+    --danger: #B91C1C;
+    --info: #1D4ED8;
+    --m-dispatch: #0F766E;
+    --m-return: #1D4ED8;
+    --m-wash: #C2410C;
+    --m-stock: #6D28D9;
+    --m-register: #374151;
+    --maxw: 780px;
+    --font: "Segoe UI", -apple-system, BlinkMacSystemFont, "Noto Sans Thai", "Sarabun", Roboto, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0C1413; --surface: #121D1C; --surface-2: #16221F;
+      --text: #E4EDEC; --muted: #93A5A3; --border: #24332F;
+      --primary: #2DD4BF; --primary-soft: #10322D;
+      --ok: #4ADE80; --warn: #FBBF24; --danger: #F87171; --info: #60A5FA;
+      --m-dispatch: #14B8A6; --m-return: #60A5FA; --m-wash: #FB923C; --m-stock: #A78BFA; --m-register: #9CA3AF;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FBFCFC; --surface: #FFFFFF; --surface-2: #F3F7F6;
+    --text: #16302E; --muted: #5A6B69; --border: #E2E8E7;
+    --primary: #0F766E; --primary-soft: #E5F1EF;
+    --ok: #15803D; --warn: #B45309; --danger: #B91C1C; --info: #1D4ED8;
+    --m-dispatch: #0F766E; --m-return: #1D4ED8; --m-wash: #C2410C; --m-stock: #6D28D9; --m-register: #374151;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0C1413; --surface: #121D1C; --surface-2: #16221F;
+    --text: #E4EDEC; --muted: #93A5A3; --border: #24332F;
+    --primary: #2DD4BF; --primary-soft: #10322D;
+    --ok: #4ADE80; --warn: #FBBF24; --danger: #F87171; --info: #60A5FA;
+    --m-dispatch: #14B8A6; --m-return: #60A5FA; --m-wash: #FB923C; --m-stock: #A78BFA; --m-register: #9CA3AF;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 32px 22px 96px; }
+
+  header.hero {
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 20px; margin-bottom: 8px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .brand .logo {
+    font-weight: 800; font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+    color: #fff; background: var(--primary); padding: 4px 9px; border-radius: 6px;
+  }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.12; margin: 16px 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 17px; margin: 0; }
+  .meta { color: var(--muted); font-size: 13.5px; margin-top: 14px; display: flex; gap: 8px 18px; flex-wrap: wrap; }
+  .meta b { color: var(--text); font-weight: 600; }
+
+  h2 {
+    font-size: 23px; margin: 52px 0 4px; padding-top: 8px; letter-spacing: -0.01em;
+    scroll-margin-top: 16px;
+  }
+  h2 .eyebrow {
+    display: block; font-size: 12.5px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--primary); margin-bottom: 3px;
+  }
+  h3 { font-size: 17.5px; margin: 30px 0 6px; }
+  p { margin: 10px 0; }
+  a { color: var(--primary); }
+  strong { font-weight: 650; }
+  code, .tag {
+    font-family: var(--mono); font-size: .88em; background: var(--surface-2);
+    padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border);
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* Table of contents */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 22px; margin: 26px 0 8px;
+  }
+  nav.toc h4 { margin: 0 0 10px; font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+  @media (max-width: 560px) { nav.toc ol { columns: 1; } }
+  nav.toc li { margin: 5px 0; break-inside: avoid; }
+  nav.toc a { text-decoration: none; color: var(--text); }
+  nav.toc a:hover { color: var(--primary); text-decoration: underline; }
+
+  /* Steps */
+  ol.steps { counter-reset: step; list-style: none; padding: 0; margin: 16px 0; }
+  ol.steps > li {
+    position: relative; padding: 2px 0 14px 44px; margin: 0;
+  }
+  ol.steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--primary-soft); color: var(--primary);
+    font-weight: 700; font-size: 14px; display: grid; place-items: center;
+    border: 1px solid var(--primary);
+  }
+  ol.steps > li:not(:last-child)::after {
+    content: ""; position: absolute; left: 15px; top: 32px; bottom: 2px;
+    width: 1px; background: var(--border);
+  }
+
+  ul.clean { padding-left: 20px; }
+  ul.clean li { margin: 6px 0; }
+
+  /* Callouts */
+  .box { border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; padding: 12px 16px; margin: 16px 0; background: var(--surface); }
+  .box p { margin: 4px 0; }
+  .box .lbl { font-weight: 700; font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; }
+  .box.tip { border-left-color: var(--ok); } .box.tip .lbl { color: var(--ok); }
+  .box.warn { border-left-color: var(--warn); } .box.warn .lbl { color: var(--warn); }
+  .box.note { border-left-color: var(--info); } .box.note .lbl { color: var(--info); }
+
+  /* Bilingual pair */
+  .bi { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 10px 0; }
+  .bi > div { padding: 12px 16px; }
+  .bi > div:first-child { border-right: 1px solid var(--border); }
+  .bi .flag { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  @media (max-width: 560px) { .bi { grid-template-columns: 1fr; } .bi > div:first-child { border-right: none; border-bottom: 1px solid var(--border); } }
+
+  /* Tables */
+  .tablewrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Mode cards */
+  .modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 18px 0; }
+  .mode { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .mode .cap { color: #fff; font-weight: 700; font-size: 16px; padding: 10px 14px; }
+  .mode .body { padding: 10px 14px; font-size: 14px; color: var(--muted); }
+  .mode .body b { color: var(--text); }
+
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0; font-size: 15px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; }
+
+  /* Theme toggle */
+  .toggle {
+    position: fixed; top: 14px; right: 14px; z-index: 10;
+    background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .toggle:hover { color: var(--primary); border-color: var(--primary); }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  @media print {
+    .toggle { display: none; }
+    body { background: #fff; color: #000; font-size: 11.5pt; }
+    .wrap { max-width: none; padding: 0; }
+    h2 { break-after: avoid; }
+    .box, .bi, .mode, .tablewrap, ol.steps > li { break-inside: avoid; }
+    a { color: #000; text-decoration: none; }
+  }
+</style>
+
+<button class="toggle" id="themeBtn" aria-label="Toggle light/dark">◐ ธีม / Theme</button>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="brand">
+      <span class="logo">LinenFlow</span>
+      <span style="color:var(--muted); font-size:14px;">ระบบจัดการผ้า · Linen Management</span>
+    </div>
+    <h1>คู่มือการใช้งาน — LaundryKing</h1>
+    <p class="sub">สำหรับเจ้าของกิจการ/ผู้ดูแล (เว็บ) และพนักงานหน้างาน (เครื่องสแกน RFID)</p>
+    <div class="meta">
+      <span><b>เว็บ:</b> https://laundryking.senses-iot.com</span>
+      <span><b>แอปสแกน:</b> LaundryKing Scanner (Chainway C72)</span>
+      <span><b>เวอร์ชันคู่มือ:</b> 1.0</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <h4>สารบัญ / Contents</h4>
+    <ol>
+      <li><a href="#overview">ระบบนี้คืออะไร</a></li>
+      <li><a href="#concepts">แนวคิดสำคัญ (ผ้าเช่า / COG / สถานะ)</a></li>
+      <li><a href="#start">เริ่มต้นใช้งาน — ลำดับการตั้งค่า</a></li>
+      <li><a href="#web">คู่มือเว็บ (ผู้ดูแล)</a></li>
+      <li><a href="#daily">งานประจำวัน (เว็บ)</a></li>
+      <li><a href="#scanner">คู่มือเครื่องสแกน (พนักงาน) — TH/EN</a></li>
+      <li><a href="#trouble">แก้ปัญหาที่พบบ่อย</a></li>
+      <li><a href="#info">ข้อมูลระบบ &amp; ติดต่อ</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 -->
+  <h2 id="overview"><span class="eyebrow">ส่วนที่ 1</span>ระบบนี้คืออะไร</h2>
+  <p>LaundryKing ใช้ระบบ <strong>LinenFlow</strong> จัดการผ้าของโรงซักแบบครบวงจร — ตั้งแต่ลงทะเบียนผ้าติดป้าย RFID, รับผ้าเข้า/จ่ายผ้าออก, ใบสั่งงาน, สต็อกวัสดุ, การเงิน ไปจนถึงรายงาน ระบบมี 2 ส่วนที่ทำงานร่วมกัน:</p>
+  <ul class="clean">
+    <li><strong>เว็บแอป</strong> — สำหรับเจ้าของ/ผู้ดูแล ใช้จัดการข้อมูลทั้งหมด เปิดจากคอมพิวเตอร์หรือมือถือผ่านเบราว์เซอร์</li>
+    <li><strong>แอปเครื่องสแกน (Chainway C72)</strong> — สำหรับพนักงานหน้างาน ใช้ยิงป้าย RFID เพื่อรับเข้า/จ่ายออก/ส่งซัก/ตรวจนับ/ลงทะเบียน ทำงานแม้ไม่มีเน็ต</li>
+  </ul>
+  <div class="box note"><p class="lbl">รองรับสองภาษา</p><p>ทั้งเว็บและแอปสลับ <strong>ไทย ⇄ อังกฤษ</strong> ได้ พนักงานที่อ่านอังกฤษ (เช่น แรงงานพม่า) กดปุ่ม <b>EN</b> ได้ทันที</p></div>
+
+  <!-- 2 -->
+  <h2 id="concepts"><span class="eyebrow">ส่วนที่ 2</span>แนวคิดสำคัญ</h2>
+  <h3>ผ้าเช่า (Rental) กับ ผ้าลูกค้า (COG)</h3>
+  <div class="kv">
+    <dt><strong>ผ้าเช่า (Rental)</strong></dt><dd>ผ้าของโรงซักเอง ปล่อยเช่าให้ลูกค้า คิดค่าเช่าต่อรอบ — ลูกค้าผูกกับผ้าเฉพาะตอน "ถูกเช่า"</dd>
+    <dt><strong>ผ้าลูกค้า (COG)</strong></dt><dd>ผ้าของลูกค้าเอง (เช่น โรงแรม/โรงพยาบาล) โรงซักแค่รับมาซักแล้วคืน คิดค่าซักต่อรอบ — ผูกกับลูกค้ารายนั้นถาวร และห้ามปนกับผ้าเช่า</dd>
+  </div>
+  <h3>สถานะของผ้าแต่ละชิ้น</h3>
+  <div class="tablewrap"><table>
+    <tr><th>สถานะ</th><th>ไทย</th><th>ความหมาย</th></tr>
+    <tr><td><span class="tag">In Stock</span></td><td>พร้อมใช้</td><td>อยู่ในคลัง พร้อมจ่าย</td></tr>
+    <tr><td><span class="tag">Washing</span></td><td>กำลังซัก</td><td>รับเข้ามาซัก / อยู่ในกระบวนการ</td></tr>
+    <tr><td><span class="tag">On-Rent</span></td><td>ถูกเช่า</td><td>จ่ายออก/อยู่กับลูกค้า</td></tr>
+  </table></div>
+  <p>ผ้าแต่ละชิ้นมี <strong>ป้าย RFID (Tag)</strong> หนึ่งป้ายต่อชิ้น เครื่องสแกนอ่านป้ายเพื่อเปลี่ยนสถานะให้อัตโนมัติ</p>
+
+  <!-- 3 -->
+  <h2 id="start"><span class="eyebrow">ส่วนที่ 3</span>เริ่มต้นใช้งาน — ลำดับการตั้งค่า</h2>
+  <p>ทำครั้งแรกตามลำดับนี้ (เจ้าของ/ผู้ดูแลทำบนเว็บ) เพื่อให้ทั้งเว็บและเครื่องสแกนมีข้อมูลให้เลือก:</p>
+  <ol class="steps">
+    <li><strong>เข้าสู่ระบบ + เปลี่ยนรหัสผ่าน</strong> — ล็อกอินด้วยบัญชีแอดมิน แล้วไปหน้า <strong>Account</strong> ตั้งรหัสผ่านใหม่ของคุณเอง</li>
+    <li><strong>เพิ่มประเภทผ้า (Linen Types)</strong> — สร้าง SKU เช่น "ผ้าเช็ดตัว 70×140 ขาว", "ผ้าปูเตียง King" พร้อมหมวด/ขนาด/ราคา</li>
+    <li><strong>เพิ่มลูกค้า (Customers)</strong> — โรงแรม/โรงพยาบาล/ร้าน/ลูกค้าทั่วไป</li>
+    <li><strong>เพิ่มผู้จัดจำหน่าย (Suppliers)</strong> และ <strong>สต็อกวัสดุ (Stock)</strong> — น้ำยา/บรรจุภัณฑ์ (ถ้าต้องการคุมต้นทุน)</li>
+    <li><strong>ลงทะเบียนผ้า (ติดป้าย RFID)</strong> — ทำบนเว็บหน้า "ลงทะเบียนผ้า" หรือใช้ <strong>โหมดลงทะเบียนบนเครื่องสแกน</strong> (แนะนำสำหรับล็อตใหญ่)</li>
+    <li><strong>เริ่มงานประจำวัน</strong> — สร้างใบสั่งงาน, จ่ายออก, รับคืน, บันทึกค่าใช้จ่าย/ใบแจ้งหนี้</li>
+    <li><strong>ดูรายงาน</strong> — รายได้/ต้นทุน/งาน ที่หน้า Reports</li>
+  </ol>
+  <div class="box tip"><p class="lbl">เคล็ดลับ</p><p>ต้องมี <strong>ประเภทผ้า / ลูกค้า / ใบสั่งงาน</strong> ในระบบก่อน ตัวเลือก (dropdown) ในเครื่องสแกนถึงจะมีให้เลือก เครื่องจะดึงข้อมูลมาเก็บไว้อัตโนมัติเมื่อเปิดหน้าเลือกงานตอนต่อเน็ต</p></div>
+
+  <!-- 4 -->
+  <h2 id="web"><span class="eyebrow">ส่วนที่ 4</span>คู่มือเว็บ (ผู้ดูแล)</h2>
+  <p>เปิด <strong>https://laundryking.senses-iot.com</strong> บนเบราว์เซอร์ → ล็อกอิน เมนูทั้งหมดอยู่แถบด้านซ้าย มุมขวาบนมีปุ่มสลับ <strong>ภาษา</strong> และ <strong>สาขา</strong></p>
+
+  <h3>Dashboard (หน้าแรก)</h3>
+  <p>สรุปภาพรวม: จำนวนงาน, งานที่กำลังทำ, รายได้เดือนนี้, จำนวนลูกค้า และกิจกรรมล่าสุด — ตัวเลขมาจากข้อมูลจริงในระบบ</p>
+
+  <h3>ประเภทผ้า · Linen Types</h3>
+  <p>คลัง "แม่แบบ" ของผ้า (SKU) กด <strong>Add</strong> เพื่อสร้าง กรอกชื่อ/รหัส/หมวด/ขนาด/สี/น้ำหนัก/ราคา แก้ไขหรือปิดใช้งานได้ — ใช้เป็นตัวเลือกตอนลงทะเบียนผ้า</p>
+
+  <h3>ลูกค้า · Customers</h3>
+  <p>เพิ่ม/แก้ไขลูกค้า (ชื่อ, ประเภท, ผู้ติดต่อ, ที่อยู่, เครดิต) คลิกชื่อลูกค้าเพื่อดูรายละเอียด + ประวัติใบสั่งงาน</p>
+
+  <h3>ผู้จัดจำหน่าย · Suppliers &amp; สต็อกวัสดุ · Stock</h3>
+  <p><strong>Suppliers</strong> = ร้านที่ซื้อของ · <strong>Stock</strong> = วัสดุสิ้นเปลือง (น้ำยา/บรรจุภัณฑ์) มีระบบเตือนของใกล้หมด และบันทึกรับเข้า/เบิกออกผ่านปุ่มเคลื่อนไหวสต็อก</p>
+
+  <h3>ลงทะเบียนผ้า · Register Linen</h3>
+  <p>ผูกป้าย RFID เข้ากับผ้า: เลือกประเภทผ้า + เจ้าของ (เช่า/COG) แล้วยิง/พิมพ์รหัสป้าย — ทำได้ทั้งทีละชิ้นและหลายชิ้น (เหมาะกับล็อตเล็ก; ล็อตใหญ่ใช้เครื่องสแกน)</p>
+
+  <h3>คลังผ้า · Inventory</h3>
+  <p>ดูรายการผ้าทั้งหมดพร้อมสถานะ (พร้อมใช้/กำลังซัก/ถูกเช่า) และเจ้าของ กรองตามสถานะ/ประเภทเจ้าของได้</p>
+
+  <!-- 5 -->
+  <h2 id="daily"><span class="eyebrow">ส่วนที่ 5</span>งานประจำวัน (เว็บ)</h2>
+  <h3>ใบสั่งงาน · Job Orders</h3>
+  <p>สร้างงานซัก: เลือกลูกค้า, ประเภทบริการ, น้ำหนัก/ราคา ระบบคิดราคารวมให้ เปลี่ยนสถานะงานและยกเลิกได้ในหน้าเดียว</p>
+  <h3>รับคืน · Check-in / จ่ายออก · Dispatch</h3>
+  <p>ปรับสถานะผ้าจริง: <strong>Check-in</strong> รับผ้าคืน (ถูกเช่า → พร้อมใช้ หรือ → กำลังซัก) · <strong>Dispatch</strong> จ่ายผ้าออกให้ลูกค้า (พร้อมใช้ → ถูกเช่า) + พิมพ์ป้ายจัดส่ง หน้าเหล่านี้ทำงานด้วยการยิง/พิมพ์รหัสป้าย เช่นเดียวกับเครื่องสแกน</p>
+  <h3>การเงิน · Expenses / Invoices</h3>
+  <p><strong>Expenses</strong> บันทึกค่าใช้จ่าย (คิด VAT ให้) · <strong>Invoices</strong> ออกใบแจ้งหนี้จากใบสั่งงาน, รับชำระบางส่วน, เปลี่ยนสถานะ, ยกเลิก</p>
+  <h3>รายงาน · Reports</h3>
+  <p>สรุปรายได้/ต้นทุน/กำไร, ยอดตามบริการ, ต้นทุนตามหมวด เลือกช่วงเวลาได้ (วัน/สัปดาห์/เดือน/ไตรมาส/ปี)</p>
+
+  <!-- 6 -->
+  <h2 id="scanner"><span class="eyebrow">ส่วนที่ 6 · Part 6</span>คู่มือเครื่องสแกน (พนักงาน)<br>Scanner Guide (Staff)</h2>
+
+  <h3>ติดตั้ง / อัปเดต — Install / Update</h3>
+  <div class="bi">
+    <div><div class="flag">ไทย</div>เปิด File Manager บนเครื่อง C72 → โฟลเดอร์ <strong>Download</strong> → แตะ <span class="tag">LaundryKingScanner.apk</span> → กด Install/Update (อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก" ครั้งแรก) หรือดาวน์โหลดจากลิงก์: <br><code>laundryking.senses-iot.com/downloads/LaundryKingScanner.apk</code></div>
+    <div><div class="flag">English</div>Open File Manager on the C72 → <strong>Download</strong> folder → tap <span class="tag">LaundryKingScanner.apk</span> → Install/Update (allow "install from unknown sources" the first time). Or download from:<br><code>laundryking.senses-iot.com/downloads/LaundryKingScanner.apk</code></div>
+  </div>
+
+  <h3>เข้าสู่ระบบ &amp; ภาษา — Login &amp; Language</h3>
+  <div class="bi">
+    <div><div class="flag">ไทย</div>เปิดแอป → กดปุ่ม <b>EN</b> หรือ <b>ไทย</b> เพื่อเลือกภาษา → กรอกอีเมล + รหัสผ่าน (บัญชีเดียวกับเว็บ) → เข้าสู่ระบบ แอปจะจำภาษาไว้</div>
+    <div><div class="flag">English</div>Open the app → tap <b>EN</b> or <b>ไทย</b> to pick the language → enter email + password (same account as the web) → sign in. The app remembers your language.</div>
+  </div>
+
+  <h3>งาน 5 อย่าง — The 5 tasks</h3>
+  <p style="color:var(--muted); font-size:14.5px;">แตะปุ่มสีที่หน้า "เลือกงาน" · Tap a colored button on the "Choose a task" screen. สีตรงกับปุ่มบนหน้าจอ · Colors match the on-screen buttons.</p>
+  <div class="modes">
+    <div class="mode"><div class="cap" style="background:var(--m-dispatch)">📤 จ่ายออก · Dispatch</div><div class="body"><b>ผ้าออกไปหาลูกค้า</b> → ถูกเช่า.<br>Hand clean linen to a customer → On-Rent. เลือกใบสั่งงานได้ (ไม่บังคับ).</div></div>
+    <div class="mode"><div class="cap" style="background:var(--m-return)">📥 รับคืน · Return</div><div class="body"><b>ผ้ากลับเข้าคลัง</b> → พร้อมใช้.<br>On-rent linen comes back → In Stock.</div></div>
+    <div class="mode"><div class="cap" style="background:var(--m-wash)">🧺 ส่งซัก · To wash</div><div class="body"><b>รับผ้ามาซัก</b> → กำลังซัก.<br>Take linen in to wash → Washing. เลือกลูกค้าได้ · pick a customer.</div></div>
+    <div class="mode"><div class="cap" style="background:var(--m-stock)">🔢 ตรวจนับ · Stock count</div><div class="body"><b>นับผ้า</b> ไม่เปลี่ยนสถานะ.<br>Count/audit only — no status change.</div></div>
+    <div class="mode"><div class="cap" style="background:var(--m-register)">➕ ลงทะเบียน · Register</div><div class="body"><b>ผ้าใหม่ติดป้าย</b>. เลือกประเภทผ้า + เจ้าของ (เช่า/COG).<br>New tagged linen: pick type + owner.</div></div>
+  </div>
+
+  <h3>วิธียิงและบันทึก — How to scan &amp; save</h3>
+  <div class="bi">
+    <div><div class="flag">ไทย</div>
+      <ol class="clean" style="margin:4px 0; padding-left:18px;">
+        <li>เลือกงาน (แตะปุ่มสี)</li>
+        <li>ถ้ามีช่องให้เลือก (ประเภทผ้า/เจ้าของ/ลูกค้า/ใบสั่งงาน) เลือกให้ครบ</li>
+        <li><strong>ดึงไกปืน</strong> บนเครื่องเพื่อยิงป้าย (หรือกดปุ่ม ▶ เริ่มสแกน) — <strong>ตัวเลขใหญ่</strong> จะเพิ่มตามจำนวนที่ยิงได้</li>
+        <li>กดปุ่มเขียว <strong>✓ บันทึก</strong></li>
+        <li>ดูผล: <b style="color:var(--ok)">✅ สำเร็จ N ชิ้น</b> = เรียบร้อย · <b style="color:var(--danger)">⚠️ ไม่ผ่าน</b> = มีบางป้ายมีปัญหา</li>
+      </ol>
+    </div>
+    <div><div class="flag">English</div>
+      <ol class="clean" style="margin:4px 0; padding-left:18px;">
+        <li>Choose a task (tap a colored button)</li>
+        <li>If pickers appear (type / owner / customer / job order), select them</li>
+        <li><strong>Pull the trigger</strong> to read tags (or tap ▶ Start scan) — the <strong>big number</strong> counts each tag read</li>
+        <li>Tap the green <strong>✓ Save</strong></li>
+        <li>Read the result: <b style="color:var(--ok)">✅ N saved</b> = done · <b style="color:var(--danger)">⚠️ rejected</b> = some tags had a problem</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="box tip"><p class="lbl">ทำงานไม่มีเน็ต · Works offline</p><p>ยิงและกดบันทึกได้แม้เน็ตหลุด — งานจะถูกเก็บไว้ในเครื่อง (ขึ้น "รอส่ง") แล้วส่งเองอัตโนมัติเมื่อกลับมามีเน็ต ไม่ต้องกลัวข้อมูลหาย.<br><span style="color:var(--muted)">Scanning &amp; saving work without internet — items are queued ("Pending") and upload automatically when back online.</span></p></div>
+
+  <!-- 7 -->
+  <h2 id="trouble"><span class="eyebrow">ส่วนที่ 7 · Part 7</span>แก้ปัญหาที่พบบ่อย · Troubleshooting</h2>
+  <div class="tablewrap"><table>
+    <tr><th>อาการ · Symptom</th><th>วิธีแก้ · Fix</th></tr>
+    <tr><td>ป้าย <b>ไม่ผ่าน (rejected)</b> ตอนบันทึก</td><td>สถานะไม่ตรงกับงาน (เช่น จ่ายออกผ้าที่ยังไม่ได้ลงทะเบียน) หรือป้ายยังไม่มีในระบบ — ตรวจว่าลงทะเบียนผ้าแล้ว และเลือกงานให้ถูก · Wrong status for the task, or the tag was never registered.</td></tr>
+    <tr><td>ช่องเลือก <b>ว่างเปล่า</b> (ไม่มีประเภทผ้า/ลูกค้า)</td><td>ยังไม่มีข้อมูลในระบบ หรือเครื่องยังไม่ได้ sync — เข้าเว็บสร้างข้อมูลก่อน แล้วเปิดหน้า "เลือกงาน" ใหม่ตอนต่อเน็ต · Create data on the web first, then reopen the app online.</td></tr>
+    <tr><td><b>อ่าน RFID ไม่ได้</b> / เครื่องอ่านไม่เจอ</td><td>แอปจะขึ้น "พิมพ์แท็กด้านล่าง" — ยังพิมพ์รหัสป้ายเองได้ · You can still type tags manually.</td></tr>
+    <tr><td><b>ลืมรหัสผ่าน</b></td><td>ติดต่อผู้ดูแล/เจ้าของให้รีเซ็ตให้ · Contact the admin/owner to reset.</td></tr>
+    <tr><td>ติดตั้งแอป<b>ไม่ได้</b></td><td>เปิดสิทธิ์ "ติดตั้งจากแหล่งที่ไม่รู้จัก" ให้ File Manager/เบราว์เซอร์ · Allow "install from unknown sources".</td></tr>
+    <tr><td>เข้าเว็บ<b>ไม่ได้</b></td><td>ตรวจอินเทอร์เน็ต และพิมพ์ที่อยู่ให้ครบ <code>https://laundryking.senses-iot.com</code></td></tr>
+  </table></div>
+
+  <!-- 8 -->
+  <h2 id="info"><span class="eyebrow">ส่วนที่ 8</span>ข้อมูลระบบ &amp; ติดต่อ</h2>
+  <dl class="kv">
+    <dt>เว็บแอป</dt><dd>https://laundryking.senses-iot.com</dd>
+    <dt>ดาวน์โหลดแอปสแกน</dt><dd>https://laundryking.senses-iot.com/downloads/LaundryKingScanner.apk</dd>
+    <dt>เครื่องสแกน</dt><dd>Chainway C72 (Android UHF RFID)</dd>
+    <dt>สาขา</dt><dd>LaundryKing (รหัส 001) — จังหวัดระนอง</dd>
+    <dt>บัญชีผู้ดูแล</dt><dd>ตั้งค่าโดยผู้ดูแลระบบ · เปลี่ยนรหัสได้ที่หน้า Account</dd>
+  </dl>
+  <div class="box warn"><p class="lbl">ความปลอดภัย</p><p>เปลี่ยนรหัสผ่านแอดมินหลังใช้ครั้งแรก · อย่าบอกรหัสกับผู้ไม่เกี่ยวข้อง · แต่ละพนักงานควรมีบัญชีของตัวเอง</p></div>
+
+  <p style="margin-top:40px; color:var(--muted); font-size:13px; text-align:center;">LaundryKing · ขับเคลื่อนด้วย LinenFlow — คู่มือฉบับ 1.0</p>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('themeBtn');
+    var root = document.documentElement;
+    btn.addEventListener('click', function () {
+      var cur = root.getAttribute('data-theme');
+      if (!cur) cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    });
+  })();
+</script>
