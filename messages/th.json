@@ -37,6 +37,7 @@
     "monthlyRevenue": "รายได้รายเดือน",
     "totalCustomers": "ลูกค้าทั้งหมด",
     "recentActivities": "กิจกรรมล่าสุด",
+    "noRecentActivity": "ยังไม่มีกิจกรรมล่าสุด",
     "fromLastMonth": "จากเดือนที่แล้ว",
     "pendingPickup": "รอรับสินค้า",
     "newThisMonth": "รายใหม่เดือนนี้",

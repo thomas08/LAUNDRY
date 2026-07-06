@@ -1,71 +1,39 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslations } from "next-intl"
+import { fetchJobOrders } from "@/lib/api/job-orders"
+import type { JobOrder } from "@/lib/types"
 
-interface Activity {
-  id: string
-  customer: string
-  service: "dryCleaning" | "washFold" | "ironing"
-  status: "pending" | "processing" | "completed" | "delivered"
-  amount: string
-  date: string
-}
-
-const activities: Activity[] = [
-  {
-    id: "ORD-001",
-    customer: "Sarah Johnson",
-    service: "dryCleaning",
-    status: "processing",
-    amount: "$45.00",
-    date: "2025-01-13",
-  },
-  {
-    id: "ORD-002",
-    customer: "Michael Chen",
-    service: "washFold",
-    status: "completed",
-    amount: "$28.50",
-    date: "2025-01-13",
-  },
-  {
-    id: "ORD-003",
-    customer: "Emily Davis",
-    service: "ironing",
-    status: "delivered",
-    amount: "$35.00",
-    date: "2025-01-12",
-  },
-  {
-    id: "ORD-004",
-    customer: "James Wilson",
-    service: "dryCleaning",
-    status: "pending",
-    amount: "$52.00",
-    date: "2025-01-12",
-  },
-  {
-    id: "ORD-005",
-    customer: "Lisa Anderson",
-    service: "washFold",
-    status: "processing",
-    amount: "$31.25",
-    date: "2025-01-11",
-  },
-]
-
-const statusColors = {
-  pending: "bg-chart-4/20 text-chart-4 border-chart-4/30",
-  processing: "bg-chart-2/20 text-chart-2 border-chart-2/30",
+const statusColors: Record<string, string> = {
+  received: "bg-chart-4/20 text-chart-4 border-chart-4/30",
+  washing: "bg-chart-2/20 text-chart-2 border-chart-2/30",
+  ready: "bg-chart-2/20 text-chart-2 border-chart-2/30",
   completed: "bg-chart-3/20 text-chart-3 border-chart-3/30",
   delivered: "bg-accent/20 text-accent border-accent/30",
+  cancelled: "bg-destructive/20 text-destructive border-destructive/30",
 }
 
-export function ActivitiesTable() {
+const humanize = (s?: string) =>
+  (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+
+export function ActivitiesTable({ branchId }: { branchId?: string }) {
   const t = useTranslations('dashboard')
+  const [orders, setOrders] = useState<JobOrder[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetchJobOrders()
+      .then((data) => { if (!cancelled) setOrders(data.slice(0, 6)) })
+      .catch(() => { if (!cancelled) setOrders([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [branchId])
 
   return (
     <Card className="border-border bg-card">
@@ -86,20 +54,36 @@ export function ActivitiesTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {activities.map((activity) => (
-                <TableRow key={activity.id} className="border-border hover:bg-accent/50">
-                  <TableCell className="font-mono text-sm text-foreground">{activity.id}</TableCell>
-                  <TableCell className="font-medium text-foreground">{activity.customer}</TableCell>
-                  <TableCell className="text-muted-foreground">{t(`services.${activity.service}`)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={statusColors[activity.status]}>
-                      {t(`statuses.${activity.status}`)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium text-foreground">{activity.amount}</TableCell>
-                  <TableCell className="text-muted-foreground">{activity.date}</TableCell>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">…</TableCell>
                 </TableRow>
-              ))}
+              ) : orders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    {t('noRecentActivity')}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                orders.map((o) => (
+                  <TableRow key={o.id} className="border-border hover:bg-accent/50">
+                    <TableCell className="font-mono text-sm text-foreground">{o.orderNumber}</TableCell>
+                    <TableCell className="font-medium text-foreground">{o.customerName || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{humanize(o.serviceType)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={statusColors[o.status] || "border-border text-muted-foreground"}>
+                        {humanize(o.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium text-foreground">
+                      ฿{Number(o.totalPrice ?? 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {(o.receivedAt || o.createdAt || '').slice(0, 10)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>

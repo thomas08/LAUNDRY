@@ -31,7 +31,8 @@ const groupedNavigation = [
     items: [
       { key: 'checkin', href: '/checkin', icon: Scan },
       { key: 'addItem', href: '/add-item', icon: Plus },
-      { key: 'aiScanner', href: '/ai-scanner', icon: Camera },
+      // AI Scanner hidden until the feature is built (no backend yet)
+      // { key: 'aiScanner', href: '/ai-scanner', icon: Camera },
       { key: 'dispatch', href: '/operations/dispatch', icon: Truck },
       { key: 'jobOrders', href: '/operations/job-orders', icon: FileText, translationNamespace: 'operations' },
     ],

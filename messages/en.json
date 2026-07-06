@@ -37,6 +37,7 @@
     "monthlyRevenue": "Monthly Revenue",
     "totalCustomers": "Total Customers",
     "recentActivities": "Recent Activities",
+    "noRecentActivity": "No recent activity",
     "fromLastMonth": "from last month",
     "pendingPickup": "pending pickup",
     "newThisMonth": "new this month",
