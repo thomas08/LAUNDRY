@@ -11,12 +11,17 @@ import java.util.UUID
  * The four MVP "modes" from the LinenFlow domain, mapped to /v1/sync/batch events.
  * See docs/device/chainway-c72-integration.md §5.
  */
-enum class Mode(val label: String, val eventType: String, val newStatus: String?) {
-    REGISTER("Register (new tag)", "item_receive", "In Stock"),
-    PICKUP("Pickup (→ Washing)", "item_status_change", "Washing"),
-    DISPATCH("Dispatch (→ On-Rent)", "item_status_change", "On-Rent"),
-    RETURN("Return (→ In Stock)", "item_status_change", "In Stock"),
-    STOCK_CHECK("Stock check", "stock_check", null);
+enum class Mode(
+    val label: String,
+    val thLabel: String,
+    val eventType: String,
+    val newStatus: String?
+) {
+    DISPATCH("Dispatch", "จ่ายออก", "item_status_change", "On-Rent"),
+    RETURN("Return", "รับคืน", "item_status_change", "In Stock"),
+    PICKUP("Pickup", "ส่งซัก", "item_status_change", "Washing"),
+    STOCK_CHECK("Stock check", "ตรวจนับ", "stock_check", null),
+    REGISTER("Register", "ลงทะเบียน", "item_receive", "In Stock");
 
     override fun toString(): String = label
 }

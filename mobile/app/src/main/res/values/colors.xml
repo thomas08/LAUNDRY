@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mode_dispatch">#0F766E</color>   <!-- จ่ายออก teal -->
+    <color name="mode_return">#1D4ED8</color>     <!-- รับคืน blue -->
+    <color name="mode_wash">#C2410C</color>       <!-- ส่งซัก orange -->
+    <color name="mode_stock">#6D28D9</color>      <!-- ตรวจนับ purple -->
+    <color name="mode_register">#374151</color>   <!-- ลงทะเบียน gray -->
+    <color name="ok_green">#15803D</color>
+    <color name="reject_red">#B91C1C</color>
+    <color name="white">#FFFFFF</color>
+</resources>

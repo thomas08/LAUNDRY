@@ -36,4 +36,23 @@
     <string name="upload_failed">Upload failed (kept for retry): %1$s</string>
     <string name="ref_summary">Cached: %1$s · %2$d customers · %3$d open orders</string>
     <string name="pending_count">Pending in queue: %1$d</string>
+
+    <!-- Simplified Thai UI (Home + Scan) for floor staff -->
+    <string name="home_title">เลือกงาน</string>
+    <string name="scan_count">%1$d</string>
+    <string name="scan_count_label">ชิ้น</string>
+    <string name="scan_start">▶ เริ่มสแกน</string>
+    <string name="scan_stop">■ หยุด</string>
+    <string name="save_btn">✓ บันทึก</string>
+    <string name="clear_th">ล้าง</string>
+    <string name="back_th">‹ กลับ</string>
+    <string name="saving_th">กำลังบันทึก…</string>
+    <string name="result_ok_th">✅ สำเร็จ %1$d ชิ้น</string>
+    <string name="result_reject_th">⚠️ ไม่ผ่าน %1$d ชิ้น</string>
+    <string name="pull_trigger">ดึงไกปืนเพื่อยิงแท็ก\nหรือกดปุ่มด้านล่าง</string>
+    <string name="reader_off_th">อ่าน RFID ไม่ได้ — พิมพ์แท็กเองด้านล่าง</string>
+    <string name="upload_fail_th">ยังไม่ได้ส่ง เก็บไว้ลองใหม่</string>
+    <string name="logout_th">ออกจากระบบ</string>
+    <string name="pending_th">รอส่ง %1$d</string>
+    <string name="last_tag">ล่าสุด: %1$s</string>
 </resources>
