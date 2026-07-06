@@ -33,8 +33,9 @@ the backend side (`/v1/auth`, `/v1/sync/*`) is **already implemented and live**.
 
 The device logs in once and stores tokens (encrypted on-device, e.g. Android Keystore).
 
-- `POST /v1/auth/login` `{ email, password }` → `{ accessToken, refreshToken, user }`.
-  Send `Authorization: Bearer <accessToken>` on every subsequent call.
+- `POST /v1/auth/login` `{ email, password }` → `{ token, refreshToken, expiresIn, user }`.
+  Send `Authorization: Bearer <token>` on every subsequent call. **Note the access-token field is
+  `token`** (not `accessToken`).
 - On `401`, call `POST /v1/auth/refresh` `{ refreshToken }` → new tokens, then retry once.
 - All `/v1/sync/*` endpoints require auth; `performedBy` (the audit user) is taken from the JWT.
 - The device operates as a real user account (create a dedicated `user`-role account per device/branch).
@@ -163,7 +164,7 @@ tag, then dispatch it:
 ```bash
 BASE=https://laundryking.senses-iot.com/v1
 TOKEN=$(curl -s -X POST $BASE/auth/login -H 'Content-Type: application/json' \
-  -d '{"email":"admin@linenflow.com","password":"<pwd>"}' | jq -r .accessToken)
+  -d '{"email":"admin@linenflow.com","password":"<pwd>"}' | jq -r .token)   # field is .token
 
 # 1) commission a tag (item_receive)
 curl -s -X POST $BASE/sync/batch -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{
