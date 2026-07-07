@@ -147,8 +147,8 @@ export class SyncModel {
     await client.query(
       `INSERT INTO scan_events
         (id, event_type, tag_id, job_order_id, branch_id, new_status, performed_by,
-         device_id, scanned_at, payload, result, rejection_reason)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+         device_id, scanned_at, payload, result, rejection_reason, session_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [
         event.clientUuid,
         event.eventType,
@@ -162,6 +162,7 @@ export class SyncModel {
         event.payload ? JSON.stringify(event.payload) : null,
         resultStatus,
         rejectionReason || null,
+        event.payload?.sessionId || null,
       ]
     );
 
