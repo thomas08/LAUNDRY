@@ -803,7 +803,8 @@
     "ownershipLabels": {
       "rental": "ผ้าเช่า",
       "customer_owned": "ผ้าลูกค้า"
-    }
+    },
+    "toggleOwnershipHint": "คลิกเพื่อสลับเจ้าของ (ผ้าเช่า / ผ้าลูกค้า)"
   },
   "register": {
     "title": "ลงทะเบียนผ้า",

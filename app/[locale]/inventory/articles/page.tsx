@@ -52,6 +52,7 @@ export default function ArticlesPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<ArticleInput>(emptyForm)
@@ -133,6 +134,23 @@ export default function ArticlesPage() {
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  // คลิกที่ badge เจ้าของเพื่อสลับ rental <-> customer_owned (optimistic + revert ถ้า error)
+  const toggleOwnership = async (a: LinenArticle) => {
+    if (!hasPermission('update') || togglingId) return
+    const next: LinenOwnership = a.defaultOwnership === 'rental' ? 'customer_owned' : 'rental'
+    setTogglingId(a.id)
+    setLoadError(null)
+    setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, defaultOwnership: next } : x)))
+    try {
+      await updateArticle(a.id, { defaultOwnership: next })
+    } catch (err) {
+      setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, defaultOwnership: a.defaultOwnership } : x)))
+      setLoadError(err instanceof ApiError ? err.message : t('saveError'))
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -228,9 +246,24 @@ export default function ArticlesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={a.defaultOwnership === 'rental' ? 'default' : 'secondary'}>
-                      {t(`ownershipLabels.${a.defaultOwnership}`)}
-                    </Badge>
+                    {hasPermission('update') ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleOwnership(a)}
+                        disabled={togglingId === a.id}
+                        title={t('toggleOwnershipHint')}
+                        className="cursor-pointer rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                      >
+                        <Badge variant={a.defaultOwnership === 'rental' ? 'default' : 'secondary'} className="gap-1">
+                          {togglingId === a.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {t(`ownershipLabels.${a.defaultOwnership}`)}
+                        </Badge>
+                      </button>
+                    ) : (
+                      <Badge variant={a.defaultOwnership === 'rental' ? 'default' : 'secondary'}>
+                        {t(`ownershipLabels.${a.defaultOwnership}`)}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     {a.unitPrice != null ? `฿${a.unitPrice.toFixed(2)}` : '—'}

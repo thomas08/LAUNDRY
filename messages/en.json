@@ -803,7 +803,8 @@
     "ownershipLabels": {
       "rental": "Rental",
       "customer_owned": "Customer-Owned"
-    }
+    },
+    "toggleOwnershipHint": "Click to switch owner (rental / customer-owned)"
   },
   "register": {
     "title": "Register Linen",
