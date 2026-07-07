@@ -13,6 +13,7 @@ import invoiceRoutes from './routes/invoices';
 import supplierRoutes from './routes/suppliers';
 import inventoryItemRoutes from './routes/inventoryItems';
 import reportRoutes from './routes/reports';
+import skuCatalogRoutes from './routes/skuCatalog';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/v1/invoices', invoiceRoutes);
 app.use('/v1/suppliers', supplierRoutes);
 app.use('/v1/inventory-items', inventoryItemRoutes);
 app.use('/v1/reports', reportRoutes);
+app.use('/v1/sku-catalog', skuCatalogRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

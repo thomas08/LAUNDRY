@@ -15,6 +15,32 @@
     "articles": "ประเภทผ้า",
     "account": "บัญชี"
   },
+  "skuCatalog": {
+    "title": "แคตตาล็อก SKU",
+    "subtitle": "รายการ SKU ทั้งหมด (ประเภท × ขนาด × กิจกรรม) จากแคตตาล็อกของลูกค้า",
+    "searchPlaceholder": "ค้นหารหัส SKU หรือชื่อ...",
+    "allCategories": "ทุกหมวด",
+    "allProducts": "ทุกประเภทสินค้า",
+    "skus": "รายการ SKU",
+    "sku": "รหัส SKU",
+    "displayName": "ชื่อ",
+    "size": "ขนาด",
+    "activity": "กิจกรรม",
+    "category": "หมวด",
+    "empty": "ไม่พบรายการ",
+    "loadError": "โหลดข้อมูลไม่สำเร็จ",
+    "summary": {
+      "totalSkus": "SKU ทั้งหมด",
+      "products": "ประเภทสินค้า",
+      "dimensions": "ขนาด × กิจกรรม"
+    },
+    "categories": {
+      "core": "หลัก",
+      "extended": "เสริม",
+      "service": "บริการ",
+      "fixed_size": "ขนาดคงที่"
+    }
+  },
   "login": {
     "title": "เข้าสู่ระบบ LinenFlow™",
     "subtitle": "กรอกข้อมูลเพื่อเข้าใช้งาน",

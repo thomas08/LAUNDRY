@@ -3,7 +3,7 @@
 import { Link, usePathname, useRouter } from "@/lib/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut, Tag, Settings } from "lucide-react"
+import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut, Tag, Tags, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { useAuth } from "@/contexts/AuthContext"
@@ -44,6 +44,7 @@ const groupedNavigation = [
       { key: 'customers', href: '/customers', icon: Users },
       { key: 'inventory', href: '/inventory', icon: Package },
       { key: 'articles', href: '/inventory/articles', icon: Tag },
+      { key: 'title', href: '/inventory/sku-catalog', icon: Tags, translationNamespace: 'skuCatalog', titleKey: 'title' },
       { key: 'stock', href: '/inventory/stock', icon: Boxes, translationNamespace: 'inventoryManagement' },
       { key: 'suppliers', href: '/inventory/suppliers', icon: Building2, translationNamespace: 'suppliers', titleKey: 'title' },
     ],
@@ -71,6 +72,7 @@ export function Sidebar() {
   const tOps = useTranslations('operations')
   const tInv = useTranslations('inventoryManagement')
   const tSup = useTranslations('suppliers')
+  const tSku = useTranslations('skuCatalog')
   const tFin = useTranslations('finance')
   const tNavRoot = useTranslations('nav')
   const pathname = usePathname()
@@ -97,6 +99,8 @@ export function Sidebar() {
       label = tInv(item.key)
     } else if (item.translationNamespace === 'suppliers') {
       label = tSup(item.titleKey || item.key)
+    } else if (item.translationNamespace === 'skuCatalog') {
+      label = tSku(item.titleKey || item.key)
     } else if (item.translationNamespace === 'finance') {
       label = tFin(item.key)
     } else {

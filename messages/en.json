@@ -15,6 +15,32 @@
     "articles": "Linen Types",
     "account": "Account"
   },
+  "skuCatalog": {
+    "title": "SKU Catalog",
+    "subtitle": "All SKUs (product × size × activity) from the customer catalog",
+    "searchPlaceholder": "Search SKU or name...",
+    "allCategories": "All categories",
+    "allProducts": "All products",
+    "skus": "SKUs",
+    "sku": "SKU",
+    "displayName": "Name",
+    "size": "Size",
+    "activity": "Activity",
+    "category": "Category",
+    "empty": "No SKUs found",
+    "loadError": "Failed to load SKU catalog",
+    "summary": {
+      "totalSkus": "Total SKUs",
+      "products": "Products",
+      "dimensions": "Sizes × Activities"
+    },
+    "categories": {
+      "core": "Core",
+      "extended": "Extended",
+      "service": "Service",
+      "fixed_size": "Fixed size"
+    }
+  },
   "login": {
     "title": "Sign in to LinenFlow™",
     "subtitle": "Enter your credentials to continue",
