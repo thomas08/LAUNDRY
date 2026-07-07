@@ -29,11 +29,13 @@ const groupedNavigation = [
     groupKey: 'operations',
     titleKey: 'operations',
     items: [
-      { key: 'checkin', href: '/checkin', icon: Scan },
+      // Check-in & Dispatch hidden until wired to the backend (still mock data,
+      // land with the RFID scanner phase). Pages still exist at their URLs.
+      // { key: 'checkin', href: '/checkin', icon: Scan },
       { key: 'addItem', href: '/add-item', icon: Plus },
       // AI Scanner hidden until the feature is built (no backend yet)
       // { key: 'aiScanner', href: '/ai-scanner', icon: Camera },
-      { key: 'dispatch', href: '/operations/dispatch', icon: Truck },
+      // { key: 'dispatch', href: '/operations/dispatch', icon: Truck },
       { key: 'jobOrders', href: '/operations/job-orders', icon: FileText, translationNamespace: 'operations' },
     ],
   },
