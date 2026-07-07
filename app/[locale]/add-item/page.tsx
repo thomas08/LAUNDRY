@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/lib/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,8 +20,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
-  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine,
+  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2,
 } from 'lucide-react'
+
+type ScanResultKind = 'applied' | 'rejected' | 'duplicate'
+interface ScanEntry {
+  key: string
+  tagId: string
+  result: ScanResultKind
+  reason?: string
+}
 
 const DEVICE_ID = 'web-registration' // browser acts as the single scanner station (MVP)
 const OWNERSHIPS: LinenOwnership[] = ['rental', 'customer_owned']
@@ -40,9 +48,17 @@ export default function RegisterLinenPage() {
   const [articleId, setArticleId] = useState<string>('')
   const [ownership, setOwnership] = useState<LinenOwnership>('rental')
 
+  const [mode, setMode] = useState<'single' | 'batch' | 'scanner'>('single')
   const [singleTag, setSingleTag] = useState('')
   const [batchInput, setBatchInput] = useState('')
   const [batchTags, setBatchTags] = useState<string[]>([])
+
+  // Scanner mode: hardware keyboard-wedge gun typing tag+Enter, one register per shot
+  const [scanValue, setScanValue] = useState('')
+  const [scanLog, setScanLog] = useState<ScanEntry[]>([])
+  const [soundOn, setSoundOn] = useState(true)
+  const scanInputRef = useRef<HTMLInputElement>(null)
+  const scanBusyRef = useRef(false)
 
   const [submitting, setSubmitting] = useState(false)
   const [results, setResults] = useState<RegResult[]>([])
@@ -103,6 +119,70 @@ export default function RegisterLinenPage() {
     [branchId, selectedArticle, ownership, t]
   )
 
+  // Short audio cue so the operator can keep eyes on the linen, not the screen.
+  const beep = useCallback((ok: boolean) => {
+    if (!soundOn) return
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext
+      if (!AC) return
+      const ctx = new AC()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.value = ok ? 880 : 220
+      const dur = ok ? 0.12 : 0.28
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur)
+      osc.start()
+      osc.stop(ctx.currentTime + dur)
+      osc.onended = () => ctx.close()
+    } catch { /* audio is best-effort */ }
+  }, [soundOn])
+
+  // Scanner mode: register a single tag immediately, append to a cumulative log.
+  const submitScan = useCallback(
+    async (raw: string) => {
+      const tag = raw.trim().toUpperCase()
+      setScanValue('')
+      if (!tag) return
+      if (!branchId) { setError(t('noBranch')); return }
+      if (!selectedArticle) { setError(t('scannerContextRequired')); beep(false); return }
+      setError(null)
+      // guard: same tag already registered this session
+      if (scanLog.some((e) => e.tagId === tag && e.result === 'applied')) {
+        setScanLog((prev) => [{ key: crypto.randomUUID(), tagId: tag, result: 'duplicate', reason: t('duplicateReason') }, ...prev])
+        beep(false)
+        scanInputRef.current?.focus()
+        return
+      }
+      if (scanBusyRef.current) return
+      scanBusyRef.current = true
+      try {
+        const events = buildRegistrationEvents({
+          tagIds: [tag], branchId, articleId: selectedArticle.id, type: selectedArticle.name, ownership,
+        })
+        const res = await syncBatch(DEVICE_ID, events)
+        const kind: ScanResultKind = res[0]?.result === 'applied' ? 'applied' : 'rejected'
+        setScanLog((prev) => [{ key: crypto.randomUUID(), tagId: tag, result: kind, reason: res[0]?.reason }, ...prev])
+        beep(kind === 'applied')
+      } catch (err) {
+        setScanLog((prev) => [{ key: crypto.randomUUID(), tagId: tag, result: 'rejected', reason: err instanceof ApiError ? err.message : t('submitError') }, ...prev])
+        beep(false)
+      } finally {
+        scanBusyRef.current = false
+        scanInputRef.current?.focus() // keep focus for the next shot
+      }
+    },
+    [branchId, selectedArticle, ownership, scanLog, t, beep]
+  )
+
+  // Focus the scan field when entering scanner mode (with a chosen article).
+  useEffect(() => {
+    if (mode === 'scanner' && articleId) scanInputRef.current?.focus()
+  }, [mode, articleId])
+
   const submitSingle = async () => {
     const tag = singleTag
     const res = await register([tag])
@@ -125,6 +205,14 @@ export default function RegisterLinenPage() {
 
   const appliedCount = results.filter((r) => r.result === 'applied').length
   const rejectedCount = results.filter((r) => r.result === 'rejected').length
+
+  const isScanner = mode === 'scanner'
+  const displayList: ScanEntry[] = isScanner
+    ? scanLog
+    : results.map((r) => ({ key: r.clientUuid, tagId: r.tagId, result: r.result, reason: r.reason }))
+  const scanRegistered = scanLog.filter((e) => e.result === 'applied').length
+  const scanRejected = scanLog.filter((e) => e.result === 'rejected').length
+  const scanDuplicate = scanLog.filter((e) => e.result === 'duplicate').length
 
   if (!hasPermission('create')) {
     return (
@@ -198,10 +286,11 @@ export default function RegisterLinenPage() {
             </div>
 
             {/* Single / Batch */}
-            <Tabs defaultValue="single">
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="single">{t('single')}</TabsTrigger>
                 <TabsTrigger value="batch">{t('batch')}</TabsTrigger>
+                <TabsTrigger value="scanner">{t('scanner')}</TabsTrigger>
               </TabsList>
 
               {/* Single */}
@@ -265,6 +354,44 @@ export default function RegisterLinenPage() {
                   {t('registerBatch', { count: batchTags.length })}
                 </Button>
               </TabsContent>
+
+              {/* Scanner: hardware gun shoots tag+Enter; each shot registers instantly */}
+              <TabsContent value="scanner" className="space-y-4 pt-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base">{t('scannerTitle')}</Label>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSoundOn((s) => !s)}
+                    title={soundOn ? t('soundOn') : t('soundOff')}
+                    aria-label={soundOn ? t('soundOn') : t('soundOff')}
+                  >
+                    {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <ScanLine className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    ref={scanInputRef}
+                    className="h-16 pl-14 text-center font-mono text-xl tracking-wide"
+                    placeholder={articleId ? t('scannerPlaceholder') : t('scannerContextRequired')}
+                    value={scanValue}
+                    disabled={!articleId}
+                    autoComplete="off"
+                    onChange={(e) => setScanValue(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitScan(scanValue) } }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{t('scannerHint')}</p>
+
+                {scanLog.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => setScanLog([])}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t('clearLog')}
+                  </Button>
+                )}
+              </TabsContent>
             </Tabs>
 
             {error && (
@@ -281,7 +408,12 @@ export default function RegisterLinenPage() {
           <CardHeader>
             <CardTitle className="text-xl">
               {t('results')}
-              {results.length > 0 && (
+              {isScanner && scanLog.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {t('scannedSummary', { registered: scanRegistered, rejected: scanRejected, duplicate: scanDuplicate })}
+                </span>
+              )}
+              {!isScanner && results.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
                   {t('resultSummary', { applied: appliedCount, rejected: rejectedCount })}
                 </span>
@@ -289,21 +421,23 @@ export default function RegisterLinenPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {results.length === 0 ? (
+            {displayList.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground">{t('noResults')}</div>
             ) : (
-              <div className="space-y-2">
-                {results.map((r) => (
-                  <div key={r.clientUuid} className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="max-h-[70vh] space-y-2 overflow-y-auto">
+                {displayList.map((r) => (
+                  <div key={r.key} className="flex items-center justify-between rounded-lg border border-border p-3">
                     <div className="flex items-center gap-2">
                       {r.result === 'applied'
                         ? <CheckCircle className="h-4 w-4 text-chart-3" />
-                        : <AlertCircle className="h-4 w-4 text-destructive" />}
+                        : r.result === 'duplicate'
+                          ? <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                          : <AlertCircle className="h-4 w-4 text-destructive" />}
                       <span className="font-mono text-sm font-medium">{r.tagId}</span>
                     </div>
                     <div className="text-right">
-                      <Badge variant={r.result === 'applied' ? 'default' : 'destructive'}>
-                        {t(`status.${r.result}`)}
+                      <Badge variant={r.result === 'applied' ? 'default' : r.result === 'duplicate' ? 'secondary' : 'destructive'}>
+                        {r.result === 'duplicate' ? t('duplicate') : t(`status.${r.result}`)}
                       </Badge>
                       {r.reason && <div className="mt-1 text-xs text-muted-foreground">{r.reason}</div>}
                     </div>

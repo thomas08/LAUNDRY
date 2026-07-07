@@ -844,6 +844,17 @@
     "noBranch": "No branch selected.",
     "noTags": "Enter at least one tag.",
     "submitError": "Failed to register. Please try again.",
-    "noPermission": "You don't have permission to register linen."
+    "noPermission": "You don't have permission to register linen.",
+    "scanner": "Scanner",
+    "scannerTitle": "Scanner mode",
+    "scannerHint": "Point the scanner here and shoot tags one after another — each scan registers instantly. No need to tap the screen.",
+    "scannerPlaceholder": "Ready — scan a tag",
+    "scannerContextRequired": "Pick a linen type first, then start scanning.",
+    "scannedSummary": "{registered} registered · {rejected} rejected · {duplicate} duplicate",
+    "duplicate": "Duplicate",
+    "duplicateReason": "Already scanned in this session",
+    "clearLog": "Clear log",
+    "soundOn": "Sound on",
+    "soundOff": "Sound off"
   }
 }

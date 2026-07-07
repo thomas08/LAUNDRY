@@ -844,6 +844,17 @@
     "noBranch": "ยังไม่ได้เลือกสาขา",
     "noTags": "ใส่อย่างน้อย 1 tag",
     "submitError": "ลงทะเบียนไม่สำเร็จ กรุณาลองใหม่",
-    "noPermission": "คุณไม่มีสิทธิ์ลงทะเบียนผ้า"
+    "noPermission": "คุณไม่มีสิทธิ์ลงทะเบียนผ้า",
+    "scanner": "โหมดสแกน",
+    "scannerTitle": "โหมดสแกน",
+    "scannerHint": "จ่อเครื่องสแกนที่ช่องนี้แล้วยิง tag ต่อเนื่องได้เลย — สแกนแต่ละครั้งลงทะเบียนทันที ไม่ต้องแตะจอ",
+    "scannerPlaceholder": "พร้อมแล้ว — ยิง tag ได้เลย",
+    "scannerContextRequired": "เลือกประเภทผ้าก่อน แล้วเริ่มสแกนได้เลย",
+    "scannedSummary": "ลงทะเบียน {registered} · ปฏิเสธ {rejected} · ซ้ำ {duplicate}",
+    "duplicate": "ซ้ำ",
+    "duplicateReason": "สแกนไปแล้วในรอบนี้",
+    "clearLog": "ล้างรายการ",
+    "soundOn": "เปิดเสียง",
+    "soundOff": "ปิดเสียง"
   }
 }
