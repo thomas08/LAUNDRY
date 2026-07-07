@@ -869,6 +869,7 @@
     "scannerPlaceholder": "Ready — scan a tag",
     "scannerContextRequired": "Pick a linen type first, then start scanning.",
     "scannedSummary": "{registered} registered · {rejected} rejected · {duplicate} duplicate",
+    "registeredCount": "registered",
     "duplicate": "Duplicate",
     "duplicateReason": "Already scanned in this session",
     "clearLog": "Clear log",

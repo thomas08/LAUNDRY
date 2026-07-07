@@ -869,6 +869,7 @@
     "scannerPlaceholder": "พร้อมแล้ว — ยิง tag ได้เลย",
     "scannerContextRequired": "เลือกประเภทผ้าก่อน แล้วเริ่มสแกนได้เลย",
     "scannedSummary": "ลงทะเบียน {registered} · ปฏิเสธ {rejected} · ซ้ำ {duplicate}",
+    "registeredCount": "ลงทะเบียนแล้ว",
     "duplicate": "ซ้ำ",
     "duplicateReason": "สแกนไปแล้วในรอบนี้",
     "clearLog": "ล้างรายการ",

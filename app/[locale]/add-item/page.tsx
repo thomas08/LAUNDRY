@@ -401,6 +401,19 @@ export default function RegisterLinenPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">{t('scannerHint')}</p>
 
+                {/* Big live counter — the operator watches this, not the list below */}
+                <div className="rounded-lg border border-border bg-muted/30 py-6 text-center">
+                  <div className="text-7xl font-bold leading-none tabular-nums text-chart-3">{scanRegistered}</div>
+                  <div className="mt-2 text-sm text-muted-foreground">{t('registeredCount')}</div>
+                  {(scanRejected > 0 || scanDuplicate > 0) && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {scanRejected > 0 && `${scanRejected} ${t('status.rejected')}`}
+                      {scanRejected > 0 && scanDuplicate > 0 && ' · '}
+                      {scanDuplicate > 0 && `${scanDuplicate} ${t('duplicate')}`}
+                    </div>
+                  )}
+                </div>
+
                 {scanLog.length > 0 && (
                   <Button variant="outline" size="sm" onClick={() => setScanLog([])}>
                     <Trash2 className="mr-2 h-4 w-4" />
