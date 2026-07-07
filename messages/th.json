@@ -12,11 +12,11 @@
     "operations": "การดำเนินงาน",
     "management": "การจัดการ",
     "logout": "ออกจากระบบ",
-    "articles": "ประเภทผ้า",
+    "articles": "จัดการชนิดผ้า",
     "account": "บัญชี"
   },
   "skuCatalog": {
-    "title": "แคตตาล็อก SKU",
+    "title": "ค้นหารหัส SKU",
     "subtitle": "รายการ SKU ทั้งหมด (ประเภท × ขนาด × กิจกรรม) จากแคตตาล็อกของลูกค้า",
     "searchPlaceholder": "ค้นหารหัส SKU หรือชื่อ...",
     "allCategories": "ทุกหมวด",
@@ -778,7 +778,7 @@
     "role": "บทบาท"
   },
   "articles": {
-    "title": "ประเภทผ้า (Articles)",
+    "title": "จัดการชนิดผ้า",
     "subtitle": "กำหนดแม่แบบประเภทผ้าที่ใช้ซ้ำได้ (SKU)",
     "addArticle": "เพิ่มประเภท",
     "editArticle": "แก้ไขประเภท",
