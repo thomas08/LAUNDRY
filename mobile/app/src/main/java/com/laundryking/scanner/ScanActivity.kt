@@ -64,6 +64,8 @@ class ScanActivity : AppCompatActivity() {
         b.header.setBackgroundColor(ContextCompat.getColor(this, modeColor(mode)))
 
         val ready = uhf.init(this)
+        // ตั้งกำลังส่งให้ต่ำตามที่ config ไว้ (กันอ่านกว้างเกิน/อ่าน tag กองข้าง ๆ)
+        if (ready) uhf.setPower(session.power)
         uhf.setOnTag { epc -> runOnUiThread { addTag(epc) } }
         if (!ready) b.hint.setText(R.string.reader_off)
 

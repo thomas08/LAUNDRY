@@ -39,6 +39,22 @@ On the box: login to `http://127.0.0.1:8080/v1/auth/login` → Bearer token → 
 endpoint. Article updates accept a **partial** body (`PUT /v1/articles/:id` with just
 `{unitPrice}` or `{defaultOwnership}`). Always revert test writes on a live customer DB.
 
+## Mobile app (Chainway C72 scanner, `mobile/`)
+Android/Kotlin, built with Gradle. **Must build with the full JDK 17** at
+`/home/sirawit/tools/jdk17` (has `jlink`). The default `java-21-openjdk` here is
+headless/JRE-only — no `jlink`/`jmods`, so the android-34 system-modules transform
+fails with "jlink executable ... does not exist".
+
+```bash
+cd mobile && JAVA_HOME=/home/sirawit/tools/jdk17 \
+  ./gradlew assembleDebug -Dorg.gradle.java.home=/home/sirawit/tools/jdk17
+# -> app/build/outputs/apk/debug/app-debug.apk
+```
+
+RFID behaviour (read range/power via `UhfReader.setPower`, tag reads) can't be
+runtime-verified without the physical C72 — verify = APK compiles + code review;
+real tuning happens on the device.
+
 ## Gotchas
 - `docker compose up --build <frontend|backend>` also recreates the other app
   container (brief restart); migrations re-run on backend start (idempotent).

@@ -77,6 +77,13 @@
             android:layout_height="wrap_content"
             android:hint="@string/hint_device" />
 
+        <EditText
+            android:id="@+id/power"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:hint="@string/hint_power" />
+
         <Button
             android:id="@+id/loginBtn"
             android:layout_width="match_parent"

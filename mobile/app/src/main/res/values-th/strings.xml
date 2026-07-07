@@ -8,6 +8,7 @@
     <string name="hint_base_url">API base URL</string>
     <string name="hint_branch">รหัสสาขา</string>
     <string name="hint_device">รหัสเครื่อง</string>
+    <string name="hint_power">กำลังส่งเครื่องอ่าน (dBm, 5–30 · ต่ำ = ระยะสั้น)</string>
     <string name="sign_in">เข้าสู่ระบบ</string>
     <string name="signing_in">กำลังเข้าสู่ระบบ…</string>
     <string name="enter_credentials">กรอกอีเมลและรหัสผ่าน</string>
@@ -16,6 +17,9 @@
     <!-- Home -->
     <string name="home_title">เลือกงาน</string>
     <string name="logout">ออกจากระบบ</string>
+    <string name="reader_power">กำลังส่งเครื่องอ่าน</string>
+    <string name="power_value">%1$d dBm</string>
+    <string name="reader_power_hint">ต่ำ = ระยะอ่านสั้นลง มีผลรอบถัดไปที่เข้าโหมดสแกน</string>
     <string name="mode_dispatch">📤  จ่ายออก</string>
     <string name="mode_return">📥  รับคืน</string>
     <string name="mode_wash">🧺  ส่งซัก</string>

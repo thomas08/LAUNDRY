@@ -75,6 +75,54 @@
             android:backgroundTint="@color/mode_register"
             android:text="@string/mode_register" />
 
+        <!-- ปรับกำลังส่งเครื่องอ่าน (dBm) ได้ที่นี่หลังล็อกอิน — ต่ำ = ระยะสั้น กันอ่านกองข้าง ๆ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/reader_power"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btnPowerDown"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="–"
+                android:textSize="22sp" />
+
+            <TextView
+                android:id="@+id/powerValue"
+                android:layout_width="96dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnPowerUp"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="+"
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:text="@string/reader_power_hint"
+            android:textColor="#888888"
+            android:textSize="12sp" />
+
         <Button
             android:id="@+id/btnLogout"
             style="?attr/borderlessButtonStyle"

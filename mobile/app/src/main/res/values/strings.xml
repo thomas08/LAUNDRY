@@ -8,6 +8,7 @@
     <string name="hint_base_url">API base URL</string>
     <string name="hint_branch">Branch ID</string>
     <string name="hint_device">Device ID</string>
+    <string name="hint_power">Reader power (dBm, 5–30 · lower = shorter range)</string>
     <string name="sign_in">Sign in</string>
     <string name="signing_in">Signing in…</string>
     <string name="enter_credentials">Enter email and password</string>
@@ -16,6 +17,9 @@
     <!-- Home -->
     <string name="home_title">Choose a task</string>
     <string name="logout">Log out</string>
+    <string name="reader_power">Reader power</string>
+    <string name="power_value">%1$d dBm</string>
+    <string name="reader_power_hint">Lower = shorter read range. Applies next time you open a scan mode.</string>
     <string name="mode_dispatch">📤  Dispatch</string>
     <string name="mode_return">📥  Return</string>
     <string name="mode_wash">🧺  To wash</string>

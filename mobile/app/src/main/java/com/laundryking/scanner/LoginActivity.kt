@@ -29,6 +29,7 @@ class LoginActivity : AppCompatActivity() {
         b.baseUrl.setText(session.baseUrl)
         b.branchId.setText(session.branchId)
         b.deviceId.setText(session.deviceId)
+        b.power.setText(session.power.toString())
         session.email?.let { b.email.setText(it) }
 
         b.loginBtn.setOnClickListener { doLogin() }
@@ -44,12 +45,14 @@ class LoginActivity : AppCompatActivity() {
         session.baseUrl = b.baseUrl.text.toString().trim()
         session.branchId = b.branchId.text.toString().trim()
         session.deviceId = b.deviceId.text.toString().trim()
+        b.power.text.toString().trim().toIntOrNull()?.let { session.power = it }
 
         b.loginBtn.isEnabled = false
         b.status.text = getString(R.string.signing_in)
         lifecycleScope.launch {
             try {
-                withContext(Dispatchers.IO) { Api(session).login(email, pass) }
+                val role = withContext(Dispatchers.IO) { Api(session).login(email, pass) }
+                session.role = role
                 goMain()
             } catch (e: Exception) {
                 b.status.text = e.message ?: getString(R.string.login_failed)

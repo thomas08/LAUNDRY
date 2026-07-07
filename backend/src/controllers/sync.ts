@@ -38,6 +38,18 @@ export async function syncBatch(req: AuthRequest, res: Response): Promise<void> 
       }
     }
 
+    // การลงทะเบียนผ้า (item_receive) จำกัดเฉพาะ admin/superadmin —
+    // พนักงานหน้างาน (role 'user') ทำได้แค่รับ/ส่งผ้า (item_status_change) เท่านั้น
+    const role = req.user!.role;
+    if (role !== 'admin' && role !== 'superadmin' && events.some((e) => e.eventType === 'item_receive')) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'Linen registration (item_receive) requires admin privileges',
+        code: 'REGISTER_FORBIDDEN',
+      });
+      return;
+    }
+
     const performedBy = req.user!.id;
     const results = await SyncModel.processBatch(deviceId, performedBy, events);
 
