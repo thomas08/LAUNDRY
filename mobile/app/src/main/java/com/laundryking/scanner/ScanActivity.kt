@@ -19,10 +19,14 @@ import com.laundryking.scanner.rfid.UhfReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 
 /** Single-mode scan screen: big count, trigger-driven, one big Save button. */
 class ScanActivity : AppCompatActivity() {
-    companion object { const val EXTRA_MODE = "mode" }
+    companion object {
+        const val EXTRA_MODE = "mode"
+        const val MAX_MANUAL = 500 // cap non-RFID key-in per add (protects the batch)
+    }
 
     private lateinit var b: ActivityScanBinding
     private lateinit var session: Session
@@ -79,6 +83,7 @@ class ScanActivity : AppCompatActivity() {
         }
         b.clearBtn.setOnClickListener { tags.clear(); render() }
         b.saveBtn.setOnClickListener { save() }
+        b.qtyAddBtn.setOnClickListener { addManualQuantity() }
 
         render(); updatePending()
     }
@@ -97,7 +102,7 @@ class ScanActivity : AppCompatActivity() {
         fun show(vararg v: View) = v.forEach { it.visibility = View.VISIBLE }
         when (mode) {
             Mode.REGISTER -> {
-                show(b.labelArticle, b.spinnerArticle, b.ownershipGroup)
+                show(b.labelArticle, b.spinnerArticle, b.ownershipGroup, b.manualGroup)
                 b.ownershipGroup.setOnCheckedChangeListener { _, id ->
                     val cog = id == R.id.rbCog
                     b.labelCustomer.visibility = if (cog) View.VISIBLE else View.GONE
@@ -109,6 +114,18 @@ class ScanActivity : AppCompatActivity() {
             Mode.PICKUP -> show(b.labelCustomer, b.spinnerCustomer)
             else -> {}
         }
+    }
+
+    /** REGISTER: mint N unique non-RFID codes (NR-...) and queue them like scanned tags.
+     *  Each becomes one linen_item via the same item_receive path — no scanning needed. */
+    private fun addManualQuantity() {
+        val qty = b.qtyInput.text.toString().trim().toIntOrNull() ?: 0
+        if (qty < 1 || qty > MAX_MANUAL) return
+        val stamp = System.currentTimeMillis().toString(36).uppercase()
+        val alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        val rand = (1..4).map { alphabet[Random.nextInt(alphabet.length)] }.joinToString("")
+        for (i in 1..qty) addTag("NR-$stamp$rand-" + i.toString().padStart(4, '0'))
+        b.qtyInput.setText("")
     }
 
     private fun addTag(epc: String) {

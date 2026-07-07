@@ -34,6 +34,8 @@
     <string name="clear">Clear</string>
     <string name="add">Add</string>
     <string name="hint_tag">Scan or type tag</string>
+    <string name="manual_qty_label">Key-in qty (no RFID)</string>
+    <string name="manual_qty_add">Add</string>
     <string name="scan_count_label">items</string>
     <string name="last_tag">Last: %1$s</string>
     <string name="pull_trigger">Pull the trigger to scan\nor use the button below</string>
