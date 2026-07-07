@@ -28,7 +28,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Plus, Edit, Trash2, Tag, Loader2, AlertCircle, Search } from 'lucide-react'
+import { Plus, Edit, Trash2, Tag, Loader2, AlertCircle, Search, DollarSign } from 'lucide-react'
 
 const CATEGORIES: LinenCategory[] = [
   'bed_sheet', 'pillow_case', 'towel', 'bath_towel', 'tablecloth',
@@ -53,6 +53,10 @@ export default function ArticlesPage() {
   const [search, setSearch] = useState('')
 
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [priceEdits, setPriceEdits] = useState<Record<string, string>>({})
+  const [savingBulk, setSavingBulk] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<ArticleInput>(emptyForm)
@@ -154,6 +158,57 @@ export default function ArticlesPage() {
     }
   }
 
+  // แก้ราคาแบบ bulk: เปิดโหมด -> เติมค่าปัจจุบันลงช่องกรอกทุกแถว
+  const startBulk = () => {
+    const init: Record<string, string> = {}
+    for (const a of articles) init[a.id] = a.unitPrice != null ? String(a.unitPrice) : ''
+    setPriceEdits(init)
+    setBulkMode(true)
+    setLoadError(null)
+    setNotice(null)
+  }
+  const cancelBulk = () => {
+    setBulkMode(false)
+    setPriceEdits({})
+  }
+  const setPrice = (id: string, v: string) => setPriceEdits((p) => ({ ...p, [id]: v }))
+
+  const parsePrice = (raw: string): number | null | undefined => {
+    const s = (raw ?? '').trim()
+    if (s === '') return null
+    const n = Number(s)
+    return Number.isNaN(n) || n < 0 ? undefined : n // undefined = ค่าไม่ถูกต้อง ข้าม
+  }
+
+  // บันทึกเฉพาะแถวที่ราคาเปลี่ยนจริง
+  const saveBulkPrices = async () => {
+    const changed = articles.filter((a) => {
+      const next = parsePrice(priceEdits[a.id] ?? '')
+      if (next === undefined) return false
+      return next !== (a.unitPrice ?? null)
+    })
+    if (changed.length === 0) {
+      setBulkMode(false)
+      setNotice(t('bulkNoChanges'))
+      return
+    }
+    setSavingBulk(true)
+    setLoadError(null)
+    try {
+      await Promise.all(
+        changed.map((a) => updateArticle(a.id, { unitPrice: parsePrice(priceEdits[a.id] ?? '') as number | null }))
+      )
+      await load()
+      setBulkMode(false)
+      setPriceEdits({})
+      setNotice(t('bulkSaved', { count: changed.length }))
+    } catch (err) {
+      setLoadError(err instanceof ApiError ? err.message : t('saveError'))
+    } finally {
+      setSavingBulk(false)
+    }
+  }
+
   const remove = async (a: LinenArticle) => {
     if (!confirm(t('confirmDelete', { name: a.name }))) return
     try {
@@ -171,12 +226,34 @@ export default function ArticlesPage() {
           <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
           <p className="mt-2 text-muted-foreground">{t('subtitle')}</p>
         </div>
-        {hasPermission('create') && (
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('addArticle')}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {bulkMode ? (
+            <>
+              <Button variant="outline" onClick={cancelBulk} disabled={savingBulk}>
+                {tc('cancel')}
+              </Button>
+              <Button onClick={saveBulkPrices} disabled={savingBulk}>
+                {savingBulk && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {t('saveBulkPrices')}
+              </Button>
+            </>
+          ) : (
+            <>
+              {hasPermission('update') && articles.length > 0 && (
+                <Button variant="outline" onClick={startBulk}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  {t('bulkEditPrices')}
+                </Button>
+              )}
+              {hasPermission('create') && (
+                <Button onClick={openCreate}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('addArticle')}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <Card className="mb-6 p-4">
@@ -195,6 +272,13 @@ export default function ArticlesPage() {
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      )}
+
+      {notice && (
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{notice}</AlertDescription>
         </Alert>
       )}
 
@@ -266,7 +350,21 @@ export default function ArticlesPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {a.unitPrice != null ? `฿${a.unitPrice.toFixed(2)}` : '—'}
+                    {bulkMode ? (
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        className="ml-auto h-8 w-24 text-right"
+                        placeholder="—"
+                        value={priceEdits[a.id] ?? ''}
+                        onChange={(e) => setPrice(a.id, e.target.value)}
+                        disabled={savingBulk}
+                      />
+                    ) : (
+                      a.unitPrice != null ? `฿${a.unitPrice.toFixed(2)}` : '—'
+                    )}
                   </TableCell>
                   <TableCell className="text-right">{a.parLevel ?? '—'}</TableCell>
                   <TableCell className="text-right">

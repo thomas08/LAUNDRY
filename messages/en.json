@@ -804,7 +804,11 @@
       "rental": "Rental",
       "customer_owned": "Customer-Owned"
     },
-    "toggleOwnershipHint": "Click to switch owner (rental / customer-owned)"
+    "toggleOwnershipHint": "Click to switch owner (rental / customer-owned)",
+    "bulkEditPrices": "Edit prices (bulk)",
+    "saveBulkPrices": "Save prices",
+    "bulkSaved": "Saved {count} prices",
+    "bulkNoChanges": "No price changes to save"
   },
   "register": {
     "title": "Register Linen",
