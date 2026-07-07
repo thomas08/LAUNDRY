@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
-  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2,
+  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2, Keyboard,
 } from 'lucide-react'
 
 type ScanResultKind = 'applied' | 'rejected' | 'duplicate'
@@ -33,6 +33,7 @@ interface ScanEntry {
 
 const DEVICE_ID = 'web-registration' // browser acts as the single scanner station (MVP)
 const OWNERSHIPS: LinenOwnership[] = ['rental', 'customer_owned']
+const MAX_MANUAL = 500 // cap non-RFID key-in per submit (protects the batch + DB)
 
 interface RegResult extends SyncEventResult {
   tagId: string
@@ -48,10 +49,11 @@ export default function RegisterLinenPage() {
   const [articleId, setArticleId] = useState<string>('')
   const [ownership, setOwnership] = useState<LinenOwnership>('rental')
 
-  const [mode, setMode] = useState<'single' | 'batch' | 'scanner'>('single')
+  const [mode, setMode] = useState<'single' | 'batch' | 'scanner' | 'manual'>('single')
   const [singleTag, setSingleTag] = useState('')
   const [batchInput, setBatchInput] = useState('')
   const [batchTags, setBatchTags] = useState<string[]>([])
+  const [quantity, setQuantity] = useState('')
 
   // Scanner mode: hardware keyboard-wedge gun typing tag+Enter, one register per shot
   const [scanValue, setScanValue] = useState('')
@@ -203,6 +205,19 @@ export default function RegisterLinenPage() {
     if (res && res.every((r) => r.result === 'applied')) setBatchTags([])
   }
 
+  // Manual key-in: no scanning — enter a quantity of non-RFID linen and let the
+  // system mint internal codes (NR-...). Each piece still becomes one linen_item
+  // through the same item_receive pipeline, so counts stay unified with RFID stock.
+  const submitManual = async () => {
+    const qty = parseInt(quantity, 10)
+    if (!Number.isFinite(qty) || qty < 1 || qty > MAX_MANUAL) { setError(t('invalidQuantity')); return }
+    const stamp = Date.now().toString(36).toUpperCase()
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
+    const codes = Array.from({ length: qty }, (_, i) => `NR-${stamp}${rand}-${String(i + 1).padStart(4, '0')}`)
+    const res = await register(codes)
+    if (res && res.every((r) => r.result === 'applied')) setQuantity('')
+  }
+
   const appliedCount = results.filter((r) => r.result === 'applied').length
   const rejectedCount = results.filter((r) => r.result === 'rejected').length
 
@@ -287,10 +302,11 @@ export default function RegisterLinenPage() {
 
             {/* Single / Batch */}
             <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="single">{t('single')}</TabsTrigger>
                 <TabsTrigger value="batch">{t('batch')}</TabsTrigger>
                 <TabsTrigger value="scanner">{t('scanner')}</TabsTrigger>
+                <TabsTrigger value="manual">{t('manual')}</TabsTrigger>
               </TabsList>
 
               {/* Single */}
@@ -391,6 +407,34 @@ export default function RegisterLinenPage() {
                     {t('clearLog')}
                   </Button>
                 )}
+              </TabsContent>
+
+              {/* Manual key-in: non-RFID linen — enter a quantity, no scanning */}
+              <TabsContent value="manual" className="space-y-4 pt-4">
+                <div className="flex items-center gap-2">
+                  <Keyboard className="h-5 w-5 text-muted-foreground" />
+                  <Label className="text-base">{t('manualTitle')}</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('quantity')} *</Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={MAX_MANUAL}
+                    className="h-14 text-center text-xl"
+                    placeholder="0"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitManual() } }}
+                  />
+                  <p className="text-xs text-muted-foreground">{t('quantityRange')} · {t('manualHint')}</p>
+                </div>
+                <Button className="w-full" size="lg" onClick={submitManual}
+                  disabled={submitting || !articleId || !quantity}>
+                  {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                  {t('registerBatch', { count: parseInt(quantity, 10) || 0 })}
+                </Button>
               </TabsContent>
             </Tabs>
 
