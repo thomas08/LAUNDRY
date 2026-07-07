@@ -96,9 +96,14 @@ export class SyncModel {
       // รับผ้าเข้าครั้งแรก: สร้าง linen_items ใหม่
       // articleId/ownership มาจาก context ที่เครื่องตั้งไว้ตอนลงทะเบียน (แบบชิ้น/แบบกลุ่ม)
       // ownership default = 'rental' ให้ตรงกับ DB ถ้าเครื่องไม่ส่งมา
-      await client.query(
+      //
+      // กันซ้ำระดับ DB: ใช้ ON CONFLICT บน PK (tag_id) เป็นตัวกันซ้ำตัวจริง — ถ้ามีอีก
+      // request สร้าง tag เดียวกันแทรกเข้ามาหลังจากเรา SELECT (race) INSERT จะไม่ชน error
+      // แต่ rowCount = 0 แทน แล้วเรา reject อย่างสุภาพ (ไม่ทำให้ทั้ง batch ล้ม)
+      const insertRes = await client.query(
         `INSERT INTO linen_items (tag_id, type, article_id, customer_id, branch_id, status, ownership, version)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 1)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+         ON CONFLICT (tag_id) DO NOTHING`,
         [
           event.tagId,
           event.payload?.type || 'unknown',
@@ -109,6 +114,10 @@ export class SyncModel {
           event.payload?.ownership || 'rental',
         ]
       );
+      if (insertRes.rowCount === 0) {
+        resultStatus = 'rejected';
+        rejectionReason = 'tag already exists';
+      }
     } else if (existingItem) {
       // เช็คว่า transition นี้ทำได้จากสถานะปัจจุบันไหม
       const currentStatus = existingItem.status as LinenItemStatus;
