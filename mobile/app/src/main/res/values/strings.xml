@@ -25,6 +25,10 @@
     <string name="mode_wash">🧺  To wash</string>
     <string name="mode_stock">🔢  Stock count</string>
     <string name="mode_register">➕  Register</string>
+    <string name="mode_station">🔗  Web station</string>
+    <string name="station_code_prompt">Enter station code</string>
+    <string name="station_link">Link</string>
+    <string name="station_bad_code">Invalid or expired code</string>
 
     <!-- Scan -->
     <string name="back">‹ Back</string>

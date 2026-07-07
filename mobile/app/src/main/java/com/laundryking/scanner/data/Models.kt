@@ -74,7 +74,8 @@ data class ScanEvent(
             articleName: String? = null,
             ownership: String = "rental",
             customerId: String? = null,
-            jobOrderId: String? = null
+            jobOrderId: String? = null,
+            sessionId: String? = null
         ): ScanEvent {
             val payload = when (mode) {
                 Mode.REGISTER -> JSONObject().apply {
@@ -82,6 +83,7 @@ data class ScanEvent(
                     if (articleId != null) put("articleId", articleId)
                     put("ownership", ownership)
                     if (ownership == "customer_owned" && customerId != null) put("customerId", customerId)
+                    if (sessionId != null) put("sessionId", sessionId) // ลิงก์สถานีเว็บ → เว็บเห็นสด
                 }
                 Mode.PICKUP -> if (customerId != null)
                     JSONObject().apply { put("customerId", customerId) } else null

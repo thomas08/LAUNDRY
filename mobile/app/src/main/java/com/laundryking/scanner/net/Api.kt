@@ -19,6 +19,16 @@ data class Reference(
     val articles: JSONArray
 )
 
+/** Context pulled from a web-created registration station (see /v1/sync/session). */
+data class SessionContext(
+    val code: String,
+    val branchId: String,
+    val articleId: String?,
+    val articleName: String?,
+    val ownership: String,
+    val customerId: String?
+)
+
 /**
  * Minimal LinenFlow API client over HttpURLConnection + org.json (no extra deps).
  * All calls are blocking — invoke from a background dispatcher.
@@ -59,6 +69,20 @@ class Api(private val session: Session) {
             customers = res.optJSONArray("customers") ?: JSONArray(),
             jobOrders = res.optJSONArray("jobOrders") ?: JSONArray(),
             articles = res.optJSONArray("articles") ?: JSONArray()
+        )
+    }
+
+    /** GET /sync/session/:code — pull the web station's context (article/ownership). */
+    fun fetchSession(code: String): SessionContext {
+        val res = get("/sync/session/$code")
+        fun strOrNull(k: String): String? = if (res.isNull(k) || !res.has(k)) null else res.optString(k)
+        return SessionContext(
+            code = res.optString("code", code),
+            branchId = res.optString("branchId", session.branchId),
+            articleId = strOrNull("articleId"),
+            articleName = strOrNull("articleName"),
+            ownership = res.optString("ownership", "rental"),
+            customerId = strOrNull("customerId")
         )
     }
 

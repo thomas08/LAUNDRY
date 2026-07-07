@@ -25,6 +25,10 @@
     <string name="mode_wash">🧺  ส่งซัก</string>
     <string name="mode_stock">🔢  ตรวจนับ</string>
     <string name="mode_register">➕  ลงทะเบียน</string>
+    <string name="mode_station">🔗  สถานีเว็บ</string>
+    <string name="station_code_prompt">ใส่รหัสสถานี</string>
+    <string name="station_link">ลิงก์</string>
+    <string name="station_bad_code">รหัสไม่ถูกต้องหรือหมดอายุ</string>
 
     <!-- Scan -->
     <string name="back">‹ กลับ</string>

@@ -26,6 +26,12 @@ class ScanActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_MODE = "mode"
         const val MAX_MANUAL = 500 // cap non-RFID key-in per add (protects the batch)
+        // Web-station link extras (REGISTER only): context comes from the web, not pickers.
+        const val EXTRA_SESSION_ID = "sessionId"
+        const val EXTRA_ARTICLE_ID = "articleId"
+        const val EXTRA_ARTICLE_NAME = "articleName"
+        const val EXTRA_OWNERSHIP = "ownership"
+        const val EXTRA_CUSTOMER_ID = "customerId"
     }
 
     private lateinit var b: ActivityScanBinding
@@ -35,6 +41,12 @@ class ScanActivity : AppCompatActivity() {
     private val uhf = UhfReader()
 
     private lateinit var mode: Mode
+    // Web-station context (non-null = linked to a web station; pickers are locked)
+    private var sessionId: String? = null
+    private var stArticleId: String? = null
+    private var stArticleName: String? = null
+    private var stOwnership: String = "rental"
+    private var stCustomerId: String? = null
     private val tags = LinkedHashSet<String>()
     private val refCache by lazy { RefCache(this) }
     private val triggerKeys = setOf(139, 280, 293, 294, 311, 312, 313, 315, 87, 88)
@@ -64,6 +76,11 @@ class ScanActivity : AppCompatActivity() {
         queue = ScanQueue(this)
 
         mode = Mode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: Mode.DISPATCH.name)
+        sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+        stArticleId = intent.getStringExtra(EXTRA_ARTICLE_ID)
+        stArticleName = intent.getStringExtra(EXTRA_ARTICLE_NAME)
+        stOwnership = intent.getStringExtra(EXTRA_OWNERSHIP) ?: "rental"
+        stCustomerId = intent.getStringExtra(EXTRA_CUSTOMER_ID)
         b.modeHeader.setText(modeLabel(mode))
         b.header.setBackgroundColor(ContextCompat.getColor(this, modeColor(mode)))
 
@@ -102,13 +119,20 @@ class ScanActivity : AppCompatActivity() {
         fun show(vararg v: View) = v.forEach { it.visibility = View.VISIBLE }
         when (mode) {
             Mode.REGISTER -> {
-                show(b.labelArticle, b.spinnerArticle, b.ownershipGroup, b.manualGroup)
-                b.ownershipGroup.setOnCheckedChangeListener { _, id ->
-                    val cog = id == R.id.rbCog
-                    b.labelCustomer.visibility = if (cog) View.VISIBLE else View.GONE
-                    b.spinnerCustomer.visibility = if (cog) View.VISIBLE else View.GONE
+                if (sessionId != null) {
+                    // Station: context is fixed by the web — lock it, show it, hide pickers.
+                    val ownLabel = getString(if (stOwnership == "customer_owned") R.string.own_cog else R.string.own_rental)
+                    b.stationContext.text = "🔗 " + sessionId + " · " + (stArticleName ?: "-") + " · " + ownLabel
+                    show(b.stationContext, b.manualGroup)
+                } else {
+                    show(b.labelArticle, b.spinnerArticle, b.ownershipGroup, b.manualGroup)
+                    b.ownershipGroup.setOnCheckedChangeListener { _, id ->
+                        val cog = id == R.id.rbCog
+                        b.labelCustomer.visibility = if (cog) View.VISIBLE else View.GONE
+                        b.spinnerCustomer.visibility = if (cog) View.VISIBLE else View.GONE
+                    }
+                    if (articles.isEmpty()) b.hint.setText(R.string.no_ref)
                 }
-                if (articles.isEmpty()) b.hint.setText(R.string.no_ref)
             }
             Mode.DISPATCH -> show(b.labelJobOrder, b.spinnerJobOrder)
             Mode.PICKUP -> show(b.labelCustomer, b.spinnerCustomer)
@@ -159,15 +183,24 @@ class ScanActivity : AppCompatActivity() {
         val article = b.spinnerArticle.selectedItem as? Option
         val customer = b.spinnerCustomer.selectedItem as? Option
         val jobOrder = b.spinnerJobOrder.selectedItem as? Option
-        val ownership = if (b.rbCog.isChecked) "customer_owned" else "rental"
+        val pickedOwnership = if (b.rbCog.isChecked) "customer_owned" else "rental"
+
+        // Station link: context comes from the web session, not the (hidden) pickers.
+        val station = sessionId != null
+        val evArticleId = if (station) stArticleId else article?.id?.ifBlank { null }
+        val evArticleName = if (station) stArticleName else article?.label
+        val evOwnership = if (station) stOwnership else pickedOwnership
+        val evCustomerId = if (station) stCustomerId else customer?.id?.ifBlank { null }
+
         val events = tags.map {
             ScanEvent.forTag(
                 mode, it, branchId,
-                articleId = article?.id?.ifBlank { null },
-                articleName = article?.label,
-                ownership = ownership,
-                customerId = customer?.id?.ifBlank { null },
-                jobOrderId = jobOrder?.id?.ifBlank { null }
+                articleId = evArticleId,
+                articleName = evArticleName,
+                ownership = evOwnership,
+                customerId = evCustomerId,
+                jobOrderId = jobOrder?.id?.ifBlank { null },
+                sessionId = sessionId
             )
         }
         events.forEach { queue.add(it) }
