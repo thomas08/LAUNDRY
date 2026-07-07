@@ -8,6 +8,7 @@ import { useCurrentBranchId } from '@/contexts/BranchContext'
 import type { LinenArticle, LinenOwnership } from '@/lib/types'
 import { fetchArticles } from '@/lib/api/articles'
 import { syncBatch, buildRegistrationEvents, type SyncEventResult } from '@/lib/api/sync'
+import { createSession, closeSession, fetchSessionEvents, type RegistrationSession, type SessionScan } from '@/lib/api/session'
 import { ApiError } from '@/lib/api/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -20,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
-  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2, Keyboard,
+  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2, Keyboard, Radio,
 } from 'lucide-react'
 
 type ScanResultKind = 'applied' | 'rejected' | 'duplicate'
@@ -49,11 +50,17 @@ export default function RegisterLinenPage() {
   const [articleId, setArticleId] = useState<string>('')
   const [ownership, setOwnership] = useState<LinenOwnership>('rental')
 
-  const [mode, setMode] = useState<'single' | 'batch' | 'scanner' | 'manual'>('single')
+  const [mode, setMode] = useState<'single' | 'batch' | 'scanner' | 'manual' | 'station'>('single')
   const [singleTag, setSingleTag] = useState('')
   const [batchInput, setBatchInput] = useState('')
   const [batchTags, setBatchTags] = useState<string[]>([])
   const [quantity, setQuantity] = useState('')
+
+  // Station mode: web holds the context + shows a code; the C72 links in and shoots.
+  const [session, setSession] = useState<RegistrationSession | null>(null)
+  const [sessionScans, setSessionScans] = useState<SessionScan[]>([])
+  const [sessionCount, setSessionCount] = useState(0)
+  const [startingStation, setStartingStation] = useState(false)
 
   // Scanner mode: hardware keyboard-wedge gun typing tag+Enter, one register per shot
   const [scanValue, setScanValue] = useState('')
@@ -218,6 +225,47 @@ export default function RegisterLinenPage() {
     if (res && res.every((r) => r.result === 'applied')) setQuantity('')
   }
 
+  // Station: web picks the context and shows a code; the C72 links in and shoots.
+  const startStation = async () => {
+    setError(null)
+    if (!branchId) { setError(t('noBranch')); return }
+    if (!selectedArticle) { setError(t('selectArticle')); return }
+    setStartingStation(true)
+    try {
+      const s = await createSession({
+        branchId, articleId: selectedArticle.id, articleName: selectedArticle.name, ownership,
+      })
+      setSession(s); setSessionScans([]); setSessionCount(0)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('submitError'))
+    } finally {
+      setStartingStation(false)
+    }
+  }
+
+  const stopStation = async () => {
+    if (session) { try { await closeSession(session.code) } catch { /* ignore */ } }
+    setSession(null); setSessionScans([]); setSessionCount(0)
+  }
+
+  // Poll the open station for tags the C72 registers, ~1.5s while on the station tab.
+  useEffect(() => {
+    if (mode !== 'station' || !session) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const data = await fetchSessionEvents(session.code)
+        if (cancelled) return
+        setSessionScans(data.events)
+        setSessionCount(data.count)
+        if (!data.active) setSession(null) // expired/closed elsewhere
+      } catch { /* transient — keep last */ }
+    }
+    poll()
+    const id = setInterval(poll, 1500)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [mode, session])
+
   const appliedCount = results.filter((r) => r.result === 'applied').length
   const rejectedCount = results.filter((r) => r.result === 'rejected').length
 
@@ -302,11 +350,12 @@ export default function RegisterLinenPage() {
 
             {/* Single / Batch */}
             <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="single">{t('single')}</TabsTrigger>
                 <TabsTrigger value="batch">{t('batch')}</TabsTrigger>
                 <TabsTrigger value="scanner">{t('scanner')}</TabsTrigger>
                 <TabsTrigger value="manual">{t('manual')}</TabsTrigger>
+                <TabsTrigger value="station">{t('station')}</TabsTrigger>
               </TabsList>
 
               {/* Single */}
@@ -448,6 +497,62 @@ export default function RegisterLinenPage() {
                   {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                   {t('registerBatch', { count: parseInt(quantity, 10) || 0 })}
                 </Button>
+              </TabsContent>
+
+              {/* Station: web holds the context + shows a code; the C72 links in and shoots live */}
+              <TabsContent value="station" className="space-y-4 pt-4">
+                <div className="flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-muted-foreground" />
+                  <Label className="text-base">{t('stationTitle')}</Label>
+                </div>
+
+                {!session ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">{t('stationHint')}</p>
+                    <Button className="w-full" size="lg" onClick={startStation}
+                      disabled={startingStation || !articleId}>
+                      {startingStation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radio className="mr-2 h-4 w-4" />}
+                      {t('stationStart')}
+                    </Button>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Code the operator keys into the C72 */}
+                    <div className="rounded-lg border border-border bg-muted/30 py-6 text-center">
+                      <div className="text-sm text-muted-foreground">{t('stationCodeLabel')}</div>
+                      <div className="mt-1 font-mono text-6xl font-bold tracking-widest text-primary">{session.code}</div>
+                      {session.articleName && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {session.articleName} · {t(`ownershipLabels.${session.ownership}`)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live counter of what the C72 has registered under this session */}
+                    <div className="rounded-lg border border-border py-4 text-center">
+                      <div className="text-7xl font-bold leading-none tabular-nums text-chart-3">{sessionCount}</div>
+                      <div className="mt-2 text-sm text-muted-foreground">{t('stationLive')}</div>
+                    </div>
+
+                    {sessionScans.length === 0 ? (
+                      <p className="text-center text-sm text-muted-foreground">{t('stationWaiting')}</p>
+                    ) : (
+                      <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                        {sessionScans.slice(0, 50).map((s) => (
+                          <div key={s.tagId} className="flex items-center gap-2 text-sm">
+                            <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-chart-3" />
+                            <span className="truncate font-mono">{s.tagId}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button variant="outline" className="w-full" onClick={stopStation}>
+                      <X className="mr-2 h-4 w-4" />
+                      {t('stationClose')}
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
 
