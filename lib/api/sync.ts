@@ -56,6 +56,9 @@ export function buildRegistrationEvents(params: {
   type: string
   ownership: LinenOwnership
   customerId?: string | null
+  /** When set, stamps the events onto a registration session so the web station
+   * counter/live list picks them up (matches the C72's session_id). */
+  sessionId?: string | null
 }): ScanEventInput[] {
   const now = new Date().toISOString()
   return params.tagIds.map((tagId) => ({
@@ -70,6 +73,7 @@ export function buildRegistrationEvents(params: {
       type: params.type,
       ownership: params.ownership,
       customerId: params.customerId ?? null,
+      sessionId: params.sessionId ?? null,
     },
   }))
 }

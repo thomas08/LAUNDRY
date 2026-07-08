@@ -5,8 +5,9 @@ import { useTranslations } from 'next-intl'
 import { Link } from '@/lib/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrentBranchId } from '@/contexts/BranchContext'
-import type { LinenArticle, LinenOwnership } from '@/lib/types'
+import type { LinenArticle, LinenOwnership, Customer } from '@/lib/types'
 import { fetchArticles } from '@/lib/api/articles'
+import { fetchCustomers, createCustomer } from '@/lib/api/customers'
 import { syncBatch, buildRegistrationEvents, type SyncEventResult } from '@/lib/api/sync'
 import { createSession, closeSession, fetchSessionEvents, type RegistrationSession, type SessionScan } from '@/lib/api/session'
 import { ApiError } from '@/lib/api/client'
@@ -21,7 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
-  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2, Keyboard, Radio,
+  Package, Plus, CheckCircle, AlertCircle, Loader2, X, ScanLine, Volume2, VolumeX, Trash2, Keyboard, Radio, UserPlus,
 } from 'lucide-react'
 
 type ScanResultKind = 'applied' | 'rejected' | 'duplicate'
@@ -35,6 +36,7 @@ interface ScanEntry {
 const DEVICE_ID = 'web-registration' // browser acts as the single scanner station (MVP)
 const OWNERSHIPS: LinenOwnership[] = ['rental', 'customer_owned']
 const MAX_MANUAL = 500 // cap non-RFID key-in per submit (protects the batch + DB)
+const NO_CUSTOMER = '__none' // Radix Select can't use '' as a value → sentinel for "no owner"
 
 interface RegResult extends SyncEventResult {
   tagId: string
@@ -49,6 +51,18 @@ export default function RegisterLinenPage() {
   const [loadingArticles, setLoadingArticles] = useState(true)
   const [articleId, setArticleId] = useState<string>('')
   const [ownership, setOwnership] = useState<LinenOwnership>('rental')
+
+  // Customer / owner — required for customer-owned (COG), optional for rental.
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loadingCustomers, setLoadingCustomers] = useState(true)
+  const [customerId, setCustomerId] = useState<string>('') // '' = no owner (rental pool)
+  const [addingCustomer, setAddingCustomer] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState('')
+  const [savingCustomer, setSavingCustomer] = useState(false)
+
+  // Station single-add: register one piece from the web under the open session.
+  const [stationTag, setStationTag] = useState('')
+  const [stationBusy, setStationBusy] = useState(false)
 
   const [mode, setMode] = useState<'single' | 'batch' | 'scanner' | 'manual' | 'station'>('single')
   const [singleTag, setSingleTag] = useState('')
@@ -77,6 +91,12 @@ export default function RegisterLinenPage() {
     () => articles.find((a) => a.id === articleId) || null,
     [articles, articleId]
   )
+  const customerName = useCallback(
+    (id: string | null) => (id ? customers.find((c) => c.id === id)?.name ?? null : null),
+    [customers]
+  )
+  // COG (customer-owned) must be tied to an owner; rental may be left unattached.
+  const cogNeedsCustomer = ownership === 'customer_owned' && !customerId
 
   const load = useCallback(async () => {
     setLoadingArticles(true)
@@ -92,6 +112,36 @@ export default function RegisterLinenPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Customers for the owner picker (branch-scoped server-side).
+  useEffect(() => {
+    let cancelled = false
+    setLoadingCustomers(true)
+    fetchCustomers()
+      .then((list) => { if (!cancelled) setCustomers(list) })
+      .catch(() => { if (!cancelled) setCustomers([]) })
+      .finally(() => { if (!cancelled) setLoadingCustomers(false) })
+    return () => { cancelled = true }
+  }, [branchId])
+
+  // Create a customer inline (COG owner may not exist yet at registration time).
+  const submitNewCustomer = async () => {
+    const name = newCustomerName.trim()
+    if (!name || !branchId) return
+    setSavingCustomer(true)
+    setError(null)
+    try {
+      const c = await createCustomer({ name, branchId })
+      setCustomers((prev) => [c, ...prev])
+      setCustomerId(c.id)
+      setNewCustomerName('')
+      setAddingCustomer(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('customerCreateError'))
+    } finally {
+      setSavingCustomer(false)
+    }
+  }
+
   // Default the owner to the article's default when the article changes.
   useEffect(() => {
     if (selectedArticle) setOwnership(selectedArticle.defaultOwnership)
@@ -103,6 +153,7 @@ export default function RegisterLinenPage() {
       setResults([])
       if (!branchId) { setError(t('noBranch')); return }
       if (!selectedArticle) { setError(t('selectArticle')); return }
+      if (ownership === 'customer_owned' && !customerId) { setError(t('customerRequiredCog')); return }
       const cleaned = Array.from(new Set(tagIds.map((x) => x.trim().toUpperCase()).filter(Boolean)))
       if (cleaned.length === 0) { setError(t('noTags')); return }
 
@@ -114,6 +165,7 @@ export default function RegisterLinenPage() {
           articleId: selectedArticle.id,
           type: selectedArticle.name,
           ownership,
+          customerId: customerId || null,
         })
         const byUuid = new Map(events.map((e) => [e.clientUuid, e.tagId]))
         const res = await syncBatch(DEVICE_ID, events)
@@ -125,7 +177,7 @@ export default function RegisterLinenPage() {
         setSubmitting(false)
       }
     },
-    [branchId, selectedArticle, ownership, t]
+    [branchId, selectedArticle, ownership, customerId, t]
   )
 
   // Short audio cue so the operator can keep eyes on the linen, not the screen.
@@ -158,6 +210,7 @@ export default function RegisterLinenPage() {
       if (!tag) return
       if (!branchId) { setError(t('noBranch')); return }
       if (!selectedArticle) { setError(t('scannerContextRequired')); beep(false); return }
+      if (ownership === 'customer_owned' && !customerId) { setError(t('customerRequiredCog')); beep(false); return }
       setError(null)
       // guard: same tag already registered this session
       if (scanLog.some((e) => e.tagId === tag && e.result === 'applied')) {
@@ -171,6 +224,7 @@ export default function RegisterLinenPage() {
       try {
         const events = buildRegistrationEvents({
           tagIds: [tag], branchId, articleId: selectedArticle.id, type: selectedArticle.name, ownership,
+          customerId: customerId || null,
         })
         const res = await syncBatch(DEVICE_ID, events)
         const kind: ScanResultKind = res[0]?.result === 'applied' ? 'applied' : 'rejected'
@@ -184,7 +238,7 @@ export default function RegisterLinenPage() {
         scanInputRef.current?.focus() // keep focus for the next shot
       }
     },
-    [branchId, selectedArticle, ownership, scanLog, t, beep]
+    [branchId, selectedArticle, ownership, customerId, scanLog, t, beep]
   )
 
   // Focus the scan field when entering scanner mode (with a chosen article).
@@ -230,10 +284,12 @@ export default function RegisterLinenPage() {
     setError(null)
     if (!branchId) { setError(t('noBranch')); return }
     if (!selectedArticle) { setError(t('selectArticle')); return }
+    if (ownership === 'customer_owned' && !customerId) { setError(t('customerRequiredCog')); return }
     setStartingStation(true)
     try {
       const s = await createSession({
         branchId, articleId: selectedArticle.id, articleName: selectedArticle.name, ownership,
+        customerId: customerId || null,
       })
       setSession(s); setSessionScans([]); setSessionCount(0)
     } catch (err) {
@@ -245,7 +301,41 @@ export default function RegisterLinenPage() {
 
   const stopStation = async () => {
     if (session) { try { await closeSession(session.code) } catch { /* ignore */ } }
-    setSession(null); setSessionScans([]); setSessionCount(0)
+    setSession(null); setSessionScans([]); setSessionCount(0); setStationTag('')
+  }
+
+  // Station single-add: register one piece from the web under the open session,
+  // stamped with the session code so it lands in the same live counter/list as
+  // the C72's shots. Uses the session's own context (article/owner), not the pickers.
+  const registerStationOne = async () => {
+    if (!session || !branchId) return
+    const tag = stationTag.trim().toUpperCase()
+    if (!tag) return
+    setError(null)
+    setStationBusy(true)
+    try {
+      const events = buildRegistrationEvents({
+        tagIds: [tag],
+        branchId,
+        articleId: session.articleId || '',
+        type: session.articleName || '',
+        ownership: session.ownership as LinenOwnership,
+        customerId: session.customerId,
+        sessionId: session.code,
+      })
+      const res = await syncBatch(DEVICE_ID, events)
+      if (res[0]?.result === 'applied') {
+        setStationTag('')
+        const data = await fetchSessionEvents(session.code) // reflect the new tag immediately
+        setSessionScans(data.events); setSessionCount(data.count)
+      } else {
+        setError(res[0]?.reason || t('submitError'))
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('submitError'))
+    } finally {
+      setStationBusy(false)
+    }
   }
 
   // Poll the open station for tags the C72 registers, ~1.5s while on the station tab.
@@ -348,6 +438,57 @@ export default function RegisterLinenPage() {
               <p className="text-xs text-muted-foreground">{t('ownershipHint')}</p>
             </div>
 
+            {/* Customer / owner — required for COG, optional for rental */}
+            <div className="space-y-2">
+              <Label>
+                {t('customer')}
+                {ownership === 'customer_owned' && <span className="text-destructive"> *</span>}
+              </Label>
+              <div className="flex gap-2">
+                <Select
+                  value={customerId || NO_CUSTOMER}
+                  onValueChange={(v) => setCustomerId(v === NO_CUSTOMER ? '' : v)}
+                  disabled={loadingCustomers}
+                >
+                  <SelectTrigger className={cogNeedsCustomer ? 'border-destructive' : ''}>
+                    <SelectValue placeholder={loadingCustomers ? t('loading') : t('selectCustomer')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CUSTOMER}>{t('noCustomer')}</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setAddingCustomer((s) => !s)}
+                  title={t('addCustomer')}
+                  aria-label={t('addCustomer')}
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {addingCustomer && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={t('newCustomerName')}
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitNewCustomer() } }}
+                    autoFocus
+                  />
+                  <Button onClick={submitNewCustomer} disabled={savingCustomer || !newCustomerName.trim()}>
+                    {savingCustomer ? <Loader2 className="h-4 w-4 animate-spin" /> : t('saveCustomer')}
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">{t('customerHint')}</p>
+            </div>
+
             {/* Single / Batch */}
             <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
               <TabsList className="grid w-full grid-cols-5">
@@ -370,7 +511,7 @@ export default function RegisterLinenPage() {
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitSingle() } }}
                   />
                 </div>
-                <Button className="w-full" size="lg" onClick={submitSingle} disabled={submitting || !articleId}>
+                <Button className="w-full" size="lg" onClick={submitSingle} disabled={submitting || !articleId || cogNeedsCustomer}>
                   {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                   {t('registerOne')}
                 </Button>
@@ -414,7 +555,7 @@ export default function RegisterLinenPage() {
                 )}
 
                 <Button className="w-full" size="lg" onClick={submitBatch}
-                  disabled={submitting || !articleId || batchTags.length === 0}>
+                  disabled={submitting || !articleId || batchTags.length === 0 || cogNeedsCustomer}>
                   {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                   {t('registerBatch', { count: batchTags.length })}
                 </Button>
@@ -493,7 +634,7 @@ export default function RegisterLinenPage() {
                   <p className="text-xs text-muted-foreground">{t('quantityRange')} · {t('manualHint')}</p>
                 </div>
                 <Button className="w-full" size="lg" onClick={submitManual}
-                  disabled={submitting || !articleId || !quantity}>
+                  disabled={submitting || !articleId || !quantity || cogNeedsCustomer}>
                   {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                   {t('registerBatch', { count: parseInt(quantity, 10) || 0 })}
                 </Button>
@@ -510,7 +651,7 @@ export default function RegisterLinenPage() {
                   <>
                     <p className="text-xs text-muted-foreground">{t('stationHint')}</p>
                     <Button className="w-full" size="lg" onClick={startStation}
-                      disabled={startingStation || !articleId}>
+                      disabled={startingStation || !articleId || cogNeedsCustomer}>
                       {startingStation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radio className="mr-2 h-4 w-4" />}
                       {t('stationStart')}
                     </Button>
@@ -524,8 +665,26 @@ export default function RegisterLinenPage() {
                       {session.articleName && (
                         <div className="mt-2 text-sm text-muted-foreground">
                           {session.articleName} · {t(`ownershipLabels.${session.ownership}`)}
+                          {customerName(session.customerId) && ` · ${customerName(session.customerId)}`}
                         </div>
                       )}
+                    </div>
+
+                    {/* Register one piece from the web under this session (no C72 needed) */}
+                    <div className="space-y-2">
+                      <Label>{t('stationAddOne')}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          className="font-mono"
+                          placeholder="LN0001"
+                          value={stationTag}
+                          onChange={(e) => setStationTag(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); registerStationOne() } }}
+                        />
+                        <Button onClick={registerStationOne} disabled={stationBusy || !stationTag.trim()} title={t('registerOne')}>
+                          {stationBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Live counter of what the C72 has registered under this session */}
