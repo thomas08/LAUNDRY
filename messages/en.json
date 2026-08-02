@@ -2,7 +2,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "customers": "Customers",
-    "inventory": "Linen Inventory",
+    "inventory": "Linen Items (RFID)",
     "checkin": "Check-In Items",
     "addItem": "Register Linen",
     "aiScanner": "AI Scanner",
@@ -12,8 +12,27 @@
     "operations": "Operations",
     "management": "Management",
     "logout": "Logout",
-    "articles": "Linen Types",
-    "account": "Account"
+    "articles": "Linen Types & Pricing",
+    "account": "Account",
+    "floor": "Daily Work",
+    "linen": "Linen & SKUs",
+    "supplies": "Supplies",
+    "work": "Today's Work",
+    "desc": {
+      "work": "Pick what you are doing right now",
+      "addItem": "Tag new linen into the system",
+      "jobOrders": "Wash jobs taken in from customers",
+      "customers": "Hotels, hospitals and walk-in customers",
+      "inventory": "Every physical piece and where it is",
+      "articles": "Define linen types, sizes and prices",
+      "skuCatalog": "Look up a customer's SKU code",
+      "stock": "Detergent, bags and other consumables",
+      "suppliers": "Who you buy supplies from",
+      "expenses": "Money going out",
+      "invoices": "Bills sent to customers",
+      "dashboard": "How the business is doing today",
+      "reports": "Sales and cost analysis"
+    }
   },
   "skuCatalog": {
     "title": "SKU Lookup",
@@ -153,8 +172,8 @@
     "jobOrdersComingSoon": "Job order history will appear here once the operations module is live."
   },
   "inventory": {
-    "title": "Linen Inventory",
-    "subtitle": "Track and manage your linen items",
+    "title": "Linen Items (RFID)",
+    "subtitle": "Every physical piece, its status and who owns it",
     "search": "Search by type or tag ID...",
     "tagId": "Tag ID",
     "type": "Type",
@@ -371,7 +390,10 @@
     "items": "items",
     "filterDescription": "Filter and search records",
     "searchBy": "Search by",
-    "or": "or"
+    "or": "or",
+    "saved": "Saved",
+    "created": "Created",
+    "deleted": "Deleted"
   },
   "status": {
     "inStock": "In Stock",
@@ -381,9 +403,9 @@
     "inactive": "Inactive"
   },
   "inventoryManagement": {
-    "title": "Inventory Management",
-    "subtitle": "Track consumables and stock levels",
-    "stock": "Stock",
+    "title": "Supply Stock",
+    "subtitle": "Detergent, bags and other consumables — track levels and every stock in/out",
+    "stock": "Supply Stock",
     "stockIn": "Stock In",
     "stockOut": "Stock Out",
     "currentStock": "Current Stock",
@@ -673,7 +695,9 @@
     "selectJobOrders": "Select job orders",
     "loadFailed": "Failed to load data",
     "saveFailed": "Failed to save",
-    "savedSuccess": "Saved successfully"
+    "savedSuccess": "Saved successfully",
+    "expensesSubtitle": "Money going out — supplies, utilities, maintenance",
+    "invoicesSubtitle": "Bill customers for completed job orders and record payments"
   },
   "reporting": {
     "title": "Reports & Analytics",
@@ -892,6 +916,79 @@
     "duplicateReason": "Already scanned in this session",
     "clearLog": "Clear log",
     "soundOn": "Sound on",
-    "soundOff": "Sound off"
+    "soundOff": "Sound off",
+    "modeHelp": "How are you adding these pieces?",
+    "modeDesc": {
+      "single": "One tag at a time — good for replacements.",
+      "batch": "Collect many tags, then save them together.",
+      "scanner": "Hands-free — every gun shot saves instantly.",
+      "manual": "No RFID — just enter how many pieces.",
+      "station": "Set it up here, scan on the C72 handheld."
+    },
+    "savedOne": "Registered 1 piece",
+    "savedMany": "Registered {count} pieces",
+    "customerSaved": "Customer added"
+  },
+  "work": {
+    "greeting": "What are you doing?",
+    "greetingNamed": "Hi {name}, what are you doing?",
+    "subtitle": "Pick a task to jump straight into it.",
+    "dashboardHint": "Looking for numbers and totals instead?",
+    "dashboardLink": "Open the dashboard",
+    "tasks": {
+      "register": {
+        "title": "Register linen",
+        "desc": "Add new pieces — scan an RFID tag or key in a quantity."
+      },
+      "jobOrder": {
+        "title": "Job orders",
+        "desc": "Take in a wash job, update its status, mark it delivered."
+      },
+      "findLinen": {
+        "title": "Find a piece of linen",
+        "desc": "Search by tag or type and see where each piece is."
+      },
+      "customers": {
+        "title": "Customers",
+        "desc": "Add a new customer or check their order history."
+      },
+      "supplies": {
+        "title": "Check supplies",
+        "desc": "Detergent, bags and consumables — record stock in/out."
+      },
+      "invoice": {
+        "title": "Invoices",
+        "desc": "Bill completed job orders and record payments."
+      }
+    }
+  },
+  "empty": {
+    "customersTitle": "No customers yet",
+    "customersDesc": "Customers are the hotels, hospitals and shops whose linen you wash. Add the first one to start taking job orders.",
+    "customersAction": "Add customer",
+    "jobOrdersTitle": "No job orders yet",
+    "jobOrdersDesc": "A job order is one batch of linen taken in from a customer to wash.",
+    "jobOrdersAction": "Create job order",
+    "jobOrdersNeedCustomer": "Add a customer first",
+    "linenTitle": "No linen registered yet",
+    "linenDesc": "Each row here is one physical piece with an RFID tag. Register linen to see it appear.",
+    "linenAction": "Register linen",
+    "articlesTitle": "No linen types yet",
+    "articlesDesc": "A linen type is the reusable definition — e.g. \"Bath Towel 70×140 White\" — with its size, colour and price.",
+    "articlesAction": "Add linen type",
+    "stockTitle": "No supplies yet",
+    "stockDesc": "Track consumables such as detergent, softener and laundry bags, and record every stock in/out.",
+    "stockAction": "Add supply item",
+    "suppliersTitle": "No suppliers yet",
+    "suppliersDesc": "Suppliers are who you buy consumables from. Linking them lets expenses roll up per supplier.",
+    "suppliersAction": "Add supplier",
+    "invoicesTitle": "No invoices yet",
+    "invoicesDesc": "Invoices bill a customer for their completed job orders.",
+    "invoicesAction": "Create invoice",
+    "expensesTitle": "No expenses yet",
+    "expensesDesc": "Record money going out — supplies, utilities, maintenance — to see real cost per period.",
+    "expensesAction": "Record expense",
+    "noResultsTitle": "Nothing matches your search",
+    "noResultsDesc": "Try a different keyword or clear the filters."
   }
 }

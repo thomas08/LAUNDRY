@@ -10,6 +10,7 @@ import { Suspense } from "react"
 import { locales } from '../../i18n/config';
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BranchProvider } from "@/contexts/BranchContext";
+import { Toaster } from "@/components/ui/sonner";
 
 type Props = {
   children: React.ReactNode;
@@ -36,6 +37,11 @@ export default async function LocaleLayout({
             <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
               <AuthGuard>{children}</AuthGuard>
             </Suspense>
+            {/* Toast feedback for saves/errors — inline alerts alone were easy
+                to miss when the operator was scrolled down a long form. */}
+            {/* theme is pinned: the app shell is always dark, and there is no
+                ThemeProvider for sonner's useTheme() to read. */}
+            <Toaster theme="dark" position="top-center" richColors closeButton />
             <Analytics />
           </BranchProvider>
         </AuthProvider>

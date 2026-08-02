@@ -3,7 +3,7 @@
 import { Link, usePathname, useRouter } from "@/lib/navigation"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut, Tag, Tags, Settings } from "lucide-react"
+import { LayoutDashboard, Users, Package, BarChart3, Menu, Sparkles, Scan, Plus, Camera, Truck, FileText, DollarSign, ShoppingCart, Boxes, Building2, Receipt, LogOut, Tag, Tags, Settings, LayoutGrid } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { useAuth } from "@/contexts/AuthContext"
@@ -17,6 +17,15 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+/**
+ * Navigation is grouped by *the job being done*, not by the table it reads.
+ *
+ * The old grouping put four linen-ish entries side by side (Linen Inventory /
+ * Linen Types / SKU Lookup / Stock) and staff could not tell them apart, so
+ * linen (physical RFID pieces + their SKU master) and supplies (detergent,
+ * bags — consumables) are now separate groups with self-describing labels.
+ * Every item also carries a `descKey` used as a hover tooltip.
+ */
 const groupedNavigation = [
   {
     groupKey: 'overview',
@@ -26,9 +35,10 @@ const groupedNavigation = [
     ],
   },
   {
-    groupKey: 'operations',
-    titleKey: 'operations',
+    groupKey: 'floor',
+    titleKey: 'floor',
     items: [
+      { key: 'work', href: '/work', icon: LayoutGrid },
       // Check-in & Dispatch hidden until wired to the backend (still mock data,
       // land with the RFID scanner phase). Pages still exist at their URLs.
       // { key: 'checkin', href: '/checkin', icon: Scan },
@@ -37,16 +47,22 @@ const groupedNavigation = [
       // { key: 'aiScanner', href: '/ai-scanner', icon: Camera },
       // { key: 'dispatch', href: '/operations/dispatch', icon: Truck },
       { key: 'jobOrders', href: '/operations/job-orders', icon: FileText, translationNamespace: 'operations' },
+      { key: 'customers', href: '/customers', icon: Users },
     ],
   },
   {
-    groupKey: 'management',
-    titleKey: 'management',
+    groupKey: 'linen',
+    titleKey: 'linen',
     items: [
-      { key: 'customers', href: '/customers', icon: Users },
       { key: 'inventory', href: '/inventory', icon: Package },
       { key: 'articles', href: '/inventory/articles', icon: Tag },
       { key: 'title', href: '/inventory/sku-catalog', icon: Tags, translationNamespace: 'skuCatalog', titleKey: 'title' },
+    ],
+  },
+  {
+    groupKey: 'supplies',
+    titleKey: 'supplies',
+    items: [
       { key: 'stock', href: '/inventory/stock', icon: Boxes, translationNamespace: 'inventoryManagement' },
       { key: 'suppliers', href: '/inventory/suppliers', icon: Building2, translationNamespace: 'suppliers', titleKey: 'title' },
     ],
@@ -68,6 +84,27 @@ const groupedNavigation = [
     ],
   },
 ]
+
+/**
+ * Hover-tooltip blurbs, keyed by nav item. Kept in `nav.desc.*` so the sidebar
+ * itself stays a compact single-line list — the long-form version of the same
+ * explanation lives on /work.
+ */
+const NAV_DESC_KEYS: Record<string, string> = {
+  work: 'work',
+  addItem: 'addItem',
+  jobOrders: 'jobOrders',
+  customers: 'customers',
+  inventory: 'inventory',
+  articles: 'articles',
+  title: 'skuCatalog',
+  stock: 'stock',
+  suppliers: 'suppliers',
+  expenses: 'expenses',
+  invoices: 'invoices',
+  dashboard: 'dashboard',
+  reports: 'reports',
+}
 
 export function Sidebar() {
   const tNav = useTranslations('nav')
@@ -109,10 +146,17 @@ export function Sidebar() {
       label = tNav(item.key)
     }
 
+    // Plain-language "what is this page for", shown on hover (and as the whole
+    // tooltip when the sidebar is collapsed to icons).
+    const descKey = NAV_DESC_KEYS[item.key]
+    const desc = descKey ? tNav(`desc.${descKey}`) : ''
+    const tooltip = desc ? `${label} — ${desc}` : label
+
     return (
       <Button
         key={item.key}
         variant="ghost"
+        title={tooltip}
         className={cn(
           'h-auto w-full justify-start gap-3 px-3 py-2.5 text-sm font-medium',
           isActive

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrentBranchId } from '@/contexts/BranchContext'
 import type { LinenArticle, LinenCategory, LinenOwnership } from '@/lib/types'
@@ -29,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Plus, Edit, Trash2, Tag, Loader2, AlertCircle, Search, DollarSign } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 
 const CATEGORIES: LinenCategory[] = [
   'bed_sheet', 'pillow_case', 'towel', 'bath_towel', 'tablecloth',
@@ -44,6 +46,7 @@ const emptyForm: ArticleInput = {
 export default function ArticlesPage() {
   const t = useTranslations('articles')
   const tc = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const { hasPermission } = useAuth()
   const branchId = useCurrentBranchId()
 
@@ -130,6 +133,7 @@ export default function ArticlesPage() {
       }
       setDialogOpen(false)
       await load()
+      toast.success(editingId ? tc('saved') : tc('created'))
     } catch (err) {
       if (err instanceof ApiError && err.code === 'DUPLICATE_CODE') {
         setFormError(t('duplicateCode'))
@@ -304,8 +308,18 @@ export default function ArticlesPage() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  {t('empty')}
+                <TableCell colSpan={7} className="p-0">
+                  {articles.length === 0 ? (
+                    <EmptyState
+                      icon={Tag}
+                      title={tEmpty('articlesTitle')}
+                      description={tEmpty('articlesDesc')}
+                      actionLabel={hasPermission('create') ? tEmpty('articlesAction') : undefined}
+                      onAction={openCreate}
+                    />
+                  ) : (
+                    <EmptyState icon={Tag} title={tEmpty('noResultsTitle')} description={tEmpty('noResultsDesc')} />
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

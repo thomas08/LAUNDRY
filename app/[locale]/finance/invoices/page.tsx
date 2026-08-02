@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { useAuth, useUser } from '@/contexts/AuthContext'
 import { useBranch, useCurrentBranchId } from '@/contexts/BranchContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,7 +34,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { FileText, DollarSign, Clock, CheckCircle, Plus, Edit, XCircle, Wallet, Loader2, AlertCircle } from 'lucide-react'
+import { FileText, DollarSign, Clock, CheckCircle, Plus, Edit, XCircle, Wallet, Loader2, AlertCircle , Receipt} from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import type { Customer, InvoiceStatus, JobOrder } from '@/lib/types'
 import {
   fetchInvoices, createInvoice, updateInvoice, recordInvoicePayment,
@@ -70,6 +72,7 @@ const emptyForm: InvoiceFormState = {
 export default function InvoicesPage() {
   const t = useTranslations('finance')
   const tCommon = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const { hasPermission } = useAuth()
   const user = useUser()
   const { currentBranch, availableBranches } = useBranch()
@@ -216,6 +219,7 @@ export default function InvoicesPage() {
       if (editingId) await updateInvoice(editingId, payload)
       else await createInvoice(payload)
       setDialogOpen(false)
+      toast.success(editingId ? tCommon('saved') : tCommon('created'))
       await load()
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('saveFailed'))
@@ -272,7 +276,7 @@ export default function InvoicesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('invoices')}</h1>
-          <p className="text-muted-foreground">{t('subtitle')}</p>
+          <p className="text-muted-foreground">{t('invoicesSubtitle')}</p>
         </div>
         {hasPermission('create') && (
           <Button onClick={openCreate} disabled={customers.length === 0}>
@@ -421,8 +425,18 @@ export default function InvoicesPage() {
                   </TableRow>
                 ) : paginatedInvoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground">
-                      {tCommon('noData')}
+                    <TableCell colSpan={10} className="p-0">
+                      {invoices.length === 0 ? (
+                        <EmptyState
+                          icon={Receipt}
+                          title={tEmpty('invoicesTitle')}
+                          description={tEmpty('invoicesDesc')}
+                          actionLabel={hasPermission('create') ? tEmpty('invoicesAction') : undefined}
+                          onAction={openCreate}
+                        />
+                      ) : (
+                        <EmptyState icon={Receipt} title={tEmpty('noResultsTitle')} description={tEmpty('noResultsDesc')} />
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import type { Customer, CustomerType } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrentBranchId } from '@/contexts/BranchContext'
@@ -98,6 +99,7 @@ export default function CustomersPage() {
       if (editingId) await updateCustomer(editingId, payload)
       else await createCustomer(payload)
       setDialogOpen(false)
+      toast.success(editingId ? tc('saved') : tc('created'))
       await load()
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('saveError'))
@@ -143,7 +145,7 @@ export default function CustomersPage() {
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : (
-        <CustomerDataTable customers={customers} onEdit={openEdit} onDelete={remove} />
+        <CustomerDataTable customers={customers} onEdit={openEdit} onDelete={remove} onAdd={openCreate} />
       )}
 
       {/* Create / Edit dialog */}

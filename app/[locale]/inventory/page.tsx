@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { EmptyState } from '@/components/EmptyState'
 import { Search, Package, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 
 const STATUSES: LinenItemStatus[] = ['In Stock', 'Washing', 'On-Rent']
@@ -29,6 +30,7 @@ function statusVariant(s: LinenItemStatus): 'default' | 'secondary' | 'outline' 
 export default function InventoryPage() {
   const t = useTranslations('inventory')
   const tc = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const user = useUser()
   const { availableBranches } = useBranch()
 
@@ -148,7 +150,8 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('tagId')}</TableHead>
+                  {/* Article first: a raw 24-char EPC is not something a human
+                      scans a list by — the linen type is. */}
                   <TableHead>{t('article')}</TableHead>
                   <TableHead>{tc('customer')}</TableHead>
                   <TableHead>{tc('status')}</TableHead>
@@ -160,22 +163,43 @@ export default function InventoryPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : pageItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      {t('empty')}
+                    <TableCell colSpan={6} className="p-0">
+                      {items.length === 0 ? (
+                        <EmptyState
+                          icon={Package}
+                          title={tEmpty('linenTitle')}
+                          description={tEmpty('linenDesc')}
+                          actionLabel={tEmpty('linenAction')}
+                          actionHref="/add-item"
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Package}
+                          title={tEmpty('noResultsTitle')}
+                          description={tEmpty('noResultsDesc')}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (
                   pageItems.map((it) => (
                     <TableRow key={it.tagId}>
-                      <TableCell className="font-mono text-sm font-medium">{it.tagId}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{it.articleName ?? it.type}</Badge>
+                        <div className="font-medium text-foreground">{it.articleName ?? it.type}</div>
+                        {/* The tag stays available (and copyable) but stops
+                            dominating the row. */}
+                        <div
+                          className="max-w-[16rem] truncate font-mono text-xs text-muted-foreground"
+                          title={it.tagId}
+                        >
+                          {it.tagId}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-muted-foreground">
                         {it.customerName ?? '—'}

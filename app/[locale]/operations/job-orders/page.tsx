@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { useAuth, useUser } from '@/contexts/AuthContext'
 import { useCurrentBranchId, useBranch } from '@/contexts/BranchContext'
 import type { Customer, JobOrder, JobOrderStatus, ServiceType } from '@/lib/types'
@@ -22,6 +23,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { EmptyState } from '@/components/EmptyState'
+import { Link } from '@/lib/navigation'
 import {
   FileText, Clock, CheckCircle2, Plus, Edit, XCircle, Loader2, AlertCircle, Package,
 } from 'lucide-react'
@@ -52,6 +55,7 @@ const emptyForm: JobOrderInput = {
 export default function JobOrdersPage() {
   const t = useTranslations('operations')
   const tc = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const { hasPermission } = useAuth()
   const user = useUser()
   const branchId = useCurrentBranchId()
@@ -156,6 +160,7 @@ export default function JobOrdersPage() {
       if (editingId) await updateJobOrder(editingId, payload)
       else await createJobOrder(payload)
       setDialogOpen(false)
+      toast.success(editingId ? tc('saved') : tc('created'))
       await load()
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('saveError'))
@@ -167,6 +172,7 @@ export default function JobOrdersPage() {
   const changeStatus = async (o: JobOrder, status: JobOrderStatus) => {
     try {
       await updateJobOrderStatus(o.id, status)
+      toast.success(tc('saved'))
       await load()
     } catch {
       setLoadError(t('saveError'))
@@ -203,7 +209,13 @@ export default function JobOrdersPage() {
       {customers.length === 0 && !loading && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{t('noCustomers')}</AlertDescription>
+          <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>{t('noCustomers')}</span>
+            {/* The warning used to be a dead end — give it the way out. */}
+            <Button asChild variant="link" size="sm" className="h-auto p-0">
+              <Link href="/customers">{tEmpty('jobOrdersNeedCustomer')}</Link>
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -271,7 +283,26 @@ export default function JobOrdersPage() {
                 {loading ? (
                   <TableRow><TableCell colSpan={10} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow>
                 ) : pageItems.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="py-10 text-center text-muted-foreground">{t('empty')}</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={10} className="p-0">
+                      {orders.length === 0 ? (
+                        <EmptyState
+                          icon={FileText}
+                          title={tEmpty('jobOrdersTitle')}
+                          description={tEmpty('jobOrdersDesc')}
+                          actionLabel={customers.length === 0 ? tEmpty('jobOrdersNeedCustomer') : tEmpty('jobOrdersAction')}
+                          actionHref={customers.length === 0 ? '/customers' : undefined}
+                          onAction={customers.length === 0 ? undefined : openCreate}
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={FileText}
+                          title={tEmpty('noResultsTitle')}
+                          description={tEmpty('noResultsDesc')}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   pageItems.map((o) => (
                     <TableRow key={o.id}>

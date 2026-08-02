@@ -36,17 +36,21 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Search, ChevronLeft, ChevronRight, Filter, Eye, Edit, Trash2 } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Filter, Eye, Edit, Trash2, Users } from 'lucide-react'
 import { Link } from '@/lib/navigation'
+import { EmptyState } from '@/components/EmptyState'
 
 interface CustomerDataTableProps {
   customers: Customer[]
   onEdit?: (customer: Customer) => void
   onDelete?: (customer: Customer) => void
+  /** Opens the page's "add customer" dialog from the empty state. */
+  onAdd?: () => void
 }
 
-export function CustomerDataTable({ customers, onEdit, onDelete }: CustomerDataTableProps) {
+export function CustomerDataTable({ customers, onEdit, onDelete, onAdd }: CustomerDataTableProps) {
   const t = useTranslations('customers')
+  const tEmpty = useTranslations('empty')
   const { user, hasPermission } = useAuth()
   const { currentBranch, availableBranches } = useBranch()
 
@@ -180,13 +184,22 @@ export function CustomerDataTable({ customers, onEdit, onDelete }: CustomerDataT
           <TableBody>
             {paginatedCustomers.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={user?.role !== 'user' ? 6 : 5}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  {searchQuery || selectedBranchId !== 'all'
-                    ? t('noResultsFound')
-                    : t('noCustomers')}
+                <TableCell colSpan={user?.role !== 'user' ? 6 : 5} className="p-0">
+                  {searchQuery || selectedBranchId !== 'all' ? (
+                    <EmptyState
+                      icon={Users}
+                      title={tEmpty('noResultsTitle')}
+                      description={tEmpty('noResultsDesc')}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Users}
+                      title={tEmpty('customersTitle')}
+                      description={tEmpty('customersDesc')}
+                      actionLabel={hasPermission('create') && onAdd ? tEmpty('customersAction') : undefined}
+                      onAction={onAdd}
+                    />
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

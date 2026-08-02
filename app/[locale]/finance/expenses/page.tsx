@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { useAuth, useUser } from '@/contexts/AuthContext'
 import { useBranch, useCurrentBranchId } from '@/contexts/BranchContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DollarSign, TrendingUp, Calendar, CreditCard, Plus, Edit, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import type { Expense, ExpenseCategory, PaymentMethod } from '@/lib/types'
 import {
   fetchExpenses, createExpense, updateExpense, deleteExpense,
@@ -70,6 +72,7 @@ const emptyForm: ExpenseInput = {
 export default function ExpensesPage() {
   const t = useTranslations('finance')
   const tCommon = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const { hasPermission } = useAuth()
   const user = useUser()
   const { currentBranch, availableBranches } = useBranch()
@@ -205,6 +208,7 @@ export default function ExpensesPage() {
       if (editingId) await updateExpense(editingId, payload)
       else await createExpense(payload)
       setDialogOpen(false)
+      toast.success(editingId ? tCommon('saved') : tCommon('created'))
       await load()
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('saveFailed'))
@@ -231,7 +235,7 @@ export default function ExpensesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('expenses')}</h1>
-          <p className="text-muted-foreground">{t('subtitle')}</p>
+          <p className="text-muted-foreground">{t('expensesSubtitle')}</p>
         </div>
         {hasPermission('create') && (
           <Button onClick={openCreate}>
@@ -395,8 +399,18 @@ export default function ExpensesPage() {
                   </TableRow>
                 ) : paginatedExpenses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
-                      {tCommon('noData')}
+                    <TableCell colSpan={8} className="p-0">
+                      {expenses.length === 0 ? (
+                        <EmptyState
+                          icon={DollarSign}
+                          title={tEmpty('expensesTitle')}
+                          description={tEmpty('expensesDesc')}
+                          actionLabel={hasPermission('create') ? tEmpty('expensesAction') : undefined}
+                          onAction={openCreate}
+                        />
+                      ) : (
+                        <EmptyState icon={DollarSign} title={tEmpty('noResultsTitle')} description={tEmpty('noResultsDesc')} />
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (

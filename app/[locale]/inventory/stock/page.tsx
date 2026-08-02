@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from "next-intl"
+import { toast } from "sonner"
 import { useState, useMemo, useEffect } from "react"
 import type {
   InventoryItemType,
@@ -83,7 +84,9 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  Boxes,
 } from "lucide-react"
+import { EmptyState } from '@/components/EmptyState'
 
 // Type value -> i18n key under `types.*` (keys are camelCase, values snake_case).
 const TYPE_OPTIONS: { value: InventoryItemType; key: string }[] = [
@@ -151,6 +154,7 @@ const numOrZero = (s: string) => (s.trim() === '' ? 0 : Number(s))
 export default function StockPage() {
   const t = useTranslations('inventoryManagement')
   const tCommon = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const { hasPermission } = useAuth()
   const branchId = useCurrentBranchId()
 
@@ -340,6 +344,7 @@ export default function StockPage() {
         setSuccess(t('createSuccess'))
       }
       setDialogOpen(false)
+      toast.success(editing ? tCommon('saved') : tCommon('created'))
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('saveError'))
     } finally {
@@ -580,10 +585,18 @@ export default function StockPage() {
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  {searchQuery || selectedType !== 'all' || alertFilter !== 'all'
-                    ? t('noMatch')
-                    : t('noItems')}
+                <TableCell colSpan={9} className="p-0">
+                  {items.length === 0 ? (
+                    <EmptyState
+                      icon={Boxes}
+                      title={tEmpty('stockTitle')}
+                      description={tEmpty('stockDesc')}
+                      actionLabel={canCreate ? tEmpty('stockAction') : undefined}
+                      onAction={openCreate}
+                    />
+                  ) : (
+                    <EmptyState icon={Boxes} title={tEmpty('noResultsTitle')} description={tEmpty('noResultsDesc')} />
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

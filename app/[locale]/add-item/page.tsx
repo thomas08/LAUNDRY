@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { Link } from '@/lib/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCurrentBranchId } from '@/contexts/BranchContext'
@@ -37,6 +38,15 @@ const DEVICE_ID = 'web-registration' // browser acts as the single scanner stati
 const OWNERSHIPS: LinenOwnership[] = ['rental', 'customer_owned']
 const MAX_MANUAL = 500 // cap non-RFID key-in per submit (protects the batch + DB)
 const NO_CUSTOMER = '__none' // Radix Select can't use '' as a value → sentinel for "no owner"
+
+/** Registration modes, in the order an operator is most likely to need them. */
+const MODES = [
+  { value: 'single', icon: Plus },
+  { value: 'batch', icon: Package },
+  { value: 'scanner', icon: ScanLine },
+  { value: 'manual', icon: Keyboard },
+  { value: 'station', icon: Radio },
+] as const
 
 interface RegResult extends SyncEventResult {
   tagId: string
@@ -135,6 +145,7 @@ export default function RegisterLinenPage() {
       setCustomerId(c.id)
       setNewCustomerName('')
       setAddingCustomer(false)
+      toast.success(t('customerSaved'))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('customerCreateError'))
     } finally {
@@ -170,6 +181,14 @@ export default function RegisterLinenPage() {
         const byUuid = new Map(events.map((e) => [e.clientUuid, e.tagId]))
         const res = await syncBatch(DEVICE_ID, events)
         setResults(res.map((r) => ({ ...r, tagId: byUuid.get(r.clientUuid) ?? '?' })))
+        // Confirm the save where the operator is looking, not only in the
+        // Results panel — on a phone that panel is below the fold.
+        const applied = res.filter((r) => r.result === 'applied').length
+        if (applied > 0) {
+          toast.success(applied === 1 ? t('savedOne') : t('savedMany', { count: applied }))
+        }
+        const rejected = res.length - applied
+        if (rejected > 0) toast.error(t('resultSummary', { applied, rejected }))
         return res
       } catch (err) {
         setError(err instanceof ApiError ? err.message : t('submitError'))
@@ -489,14 +508,27 @@ export default function RegisterLinenPage() {
               <p className="text-xs text-muted-foreground">{t('customerHint')}</p>
             </div>
 
-            {/* Single / Batch */}
+            {/* Mode picker. Five bare tab labels ("Single / Batch / Scanner /
+                Key-in / Station") gave the operator no way to tell them apart,
+                so each mode is a card carrying its own "use this when" line. */}
             <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="single">{t('single')}</TabsTrigger>
-                <TabsTrigger value="batch">{t('batch')}</TabsTrigger>
-                <TabsTrigger value="scanner">{t('scanner')}</TabsTrigger>
-                <TabsTrigger value="manual">{t('manual')}</TabsTrigger>
-                <TabsTrigger value="station">{t('station')}</TabsTrigger>
+              <Label className="mb-2 block">{t('modeHelp')}</Label>
+              <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-2 lg:grid-cols-3">
+                {MODES.map(({ value, icon: ModeIcon }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="h-full flex-col items-start gap-1 whitespace-normal rounded-lg border border-border bg-card p-3 text-left data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <ModeIcon className="h-4 w-4 flex-shrink-0" />
+                      {t(value)}
+                    </span>
+                    <span className="text-xs font-normal leading-snug text-muted-foreground">
+                      {t(`modeDesc.${value}`)}
+                    </span>
+                  </TabsTrigger>
+                ))}
               </TabsList>
 
               {/* Single */}

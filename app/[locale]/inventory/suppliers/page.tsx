@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from "next-intl"
+import { toast } from "sonner"
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { Supplier } from "@/lib/types"
 import { useAuth } from "@/contexts/AuthContext"
@@ -62,6 +63,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react"
+import { EmptyState } from '@/components/EmptyState'
 
 const emptyForm: SupplierInput = {
   name: '',
@@ -78,6 +80,7 @@ const emptyForm: SupplierInput = {
 export default function SuppliersPage() {
   const t = useTranslations('suppliers')
   const tCommon = useTranslations('common')
+  const tEmpty = useTranslations('empty')
   const { hasPermission } = useAuth()
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -207,6 +210,7 @@ export default function SuppliersPage() {
       }
       setDialogOpen(false)
       await load()
+      toast.success(editing ? tCommon('saved') : tCommon('created'))
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : t('saveError'))
     } finally {
@@ -348,8 +352,18 @@ export default function SuppliersPage() {
               </TableRow>
             ) : paginatedSuppliers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? t('noMatchingSuppliers') : t('noSuppliersFound')}
+                <TableCell colSpan={8} className="p-0">
+                  {suppliers.length === 0 ? (
+                    <EmptyState
+                      icon={Building2}
+                      title={tEmpty('suppliersTitle')}
+                      description={tEmpty('suppliersDesc')}
+                      actionLabel={hasPermission('create') ? tEmpty('suppliersAction') : undefined}
+                      onAction={openCreate}
+                    />
+                  ) : (
+                    <EmptyState icon={Building2} title={tEmpty('noResultsTitle')} description={tEmpty('noResultsDesc')} />
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

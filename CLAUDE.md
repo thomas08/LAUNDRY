@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This is a **two-part repo**: the Next.js frontend lives at the root, and a standalone Node.js API lives in `backend/`. They are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/change-password/RBAC via `/v1/auth/*`). **Linen Articles, Customers, Inventory list, Job Orders, Finance (expenses/invoices), Suppliers, consumable Stock, Reports, linen registration, and account/password** are all backend-wired (`/v1/articles`, `/v1/customers`, `/v1/linen-items`, `/v1/job-orders`, `/v1/expenses`, `/v1/invoices`, `/v1/suppliers`, `/v1/inventory-items`, `/v1/reports`, `/v1/sync/batch`). All business data pages now render from the real backend; only `checkin` and `ai-scanner` remain on mock data.
+This is a **three-part repo**: the Next.js frontend lives at the root, a standalone Node.js API lives in `backend/`, and a native Android RFID scanner app (Chainway C72) lives in `mobile/` (see "Mobile scanner app" below). The frontend and backend are independent projects with separate `package.json`, `tsconfig.json`, and dependencies. **Authentication is wired to the real backend** (login/logout/refresh/change-password/RBAC via `/v1/auth/*`). **Linen Articles, SKU Catalog, Customers, Inventory list, Job Orders, Finance (expenses/invoices), Suppliers, consumable Stock, Reports, linen registration, check-in, and account/password** are all backend-wired (`/v1/articles`, `/v1/sku-catalog`, `/v1/customers`, `/v1/linen-items`, `/v1/job-orders`, `/v1/expenses`, `/v1/invoices`, `/v1/suppliers`, `/v1/inventory-items`, `/v1/reports`, `/v1/sync/batch`, `/v1/sync/session/*`). Nearly all pages render from the real backend; only `operations/dispatch` and `ai-scanner` remain on mock data.
 
 ## Development Commands
 
@@ -96,13 +96,13 @@ as simple as possible while effective: a **mode-first** screen ("What are you do
 up / Dispatch-return / Stock check) that drops the operator straight into a scan-driven view, minimizing
 typing. Keep primary actions to 3–4.
 
-**Where this lives in code today:** `add-item` (individual registration), `checkin` (intake/return of
-on-rent items), and the backend `sync` module (`item_receive` = the registration primitive). All
-frontend pages are still mock data; the backend now has `linen_items` + `scan_events` +
-`linen_articles` (migration 003), but still **no** customer or job-order tables, and **no** REST
-endpoints for articles/inventory (only the sync pipeline writes items). Note: mock data in `inventory`
-and `checkin` uses inconsistent status casing (`on_rent`/`in_stock`/`washing`) vs the canonical
-`LinenItemStatus` (`'On-Rent'`/`'In Stock'`/`'Washing'`) — reconcile when wiring real data.
+**Where this lives in code today:** `add-item` (registration — five modes: single/batch/scanner-gun/
+manual/station, see "Done — Registration modes" below), `checkin` (intake/return, backend-wired), and
+the backend `sync` module (`item_receive` = the registration primitive). The backend now has the full
+schema through migration 011 (`linen_items`, `scan_events`, `linen_articles`, `customers`,
+`job_orders`, finance, suppliers, stock, `sku_catalog`, `registration_sessions`) with REST endpoints
+for all of them. Canonical linen status is `LinenItemStatus` (`'On-Rent'`/`'In Stock'`/`'Washing'`) —
+the remaining mock page (`operations/dispatch`) may still use inconsistent casing; reconcile when wiring.
 
 ## Project Structure
 
@@ -409,6 +409,8 @@ Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refr
 - `GET/POST /v1/invoices`, `GET/PUT/DELETE /v1/invoices/:id`, `PATCH /v1/invoices/:id/payment`, `PATCH /v1/invoices/:id/status` — Invoice CRUD (`InvoiceModel`, migration 006). `subtotal` = SUM of linked non-cancelled job_orders' `total_price`; `vat`/`total` server-side; `recordPayment` adjusts paid/remaining + status; DELETE = cancel.
 - `GET/POST /v1/suppliers`, `GET/PUT/DELETE /v1/suppliers/:id` — Supplier CRUD (`SupplierModel`, migration 007). **Org-global** (no branch scoping — RBAC by permission only); `code` `SUP-NNNN` from a sequence; soft-delete. Migration 007 also adds the `expenses.supplier_id → suppliers(id)` FK.
 - `GET/POST /v1/inventory-items`, `GET/PUT/DELETE /v1/inventory-items/:id`, `GET/POST /v1/inventory-items/:id/transactions` — Consumable Stock (`InventoryItemModel`, migration 008: `inventory_items` + `stock_transactions`). Branch-scoped; `code` `INV-NNNN`; `current_stock` changes **only** via the transactions POST (atomic `SELECT FOR UPDATE` + ledger insert + stock update in one `transaction()`); `applyStockMovement` is a pure exported fn (stock_in/return add, stock_out/adjustment subtract + reject-negative, transfer 400 in v1); low-stock `alertLevel` derived at read time; FK `supplier_id → suppliers(id)`.
+- `GET /v1/sku-catalog`, `GET /v1/sku-catalog/dimensions` — read-only customer SKU master catalog (`SkuCatalogModel`, migrations 009/010; migration 010 also seeds `linen_articles` from it). RBAC `read`. Backs the **SKU Lookup** page (`/inventory/sku-catalog`, `lib/api/sku-catalog.ts`).
+- `POST /v1/sync/session`, `GET /v1/sync/session/:code`, `GET /v1/sync/session/:code/events`, `POST /v1/sync/session/:code/close` — **web-driven registration station** (`RegistrationSessionModel`, migration 011). The web app opens a station (picks Article + owner context, gets a short code); a C72 handheld links in by code and rapid-scans; the web polls `.../events` for a live count. See "Registration station" below.
 - `GET /v1/reports/summary`, `GET /v1/reports/sales-by-service`, `GET /v1/reports/cost-by-category` — read-only aggregates (`ReportModel`, no new tables), branch-scoped, RBAC `view_reports`. Pure `resolvePeriodRange`/`pctChange` in `utils/reportPeriod.ts`.
 - `POST /v1/sync/batch` — handheld RFID devices upload a batch of offline-collected scan events. Registration (single or batch) is `item_receive` events here; `payload.articleId`/`payload.ownership` link the item to an Article and set rental/COG.
 - `GET /v1/sync/reference?branchId=...` — reference data for devices to cache for offline use
@@ -418,6 +420,19 @@ Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refr
 **Offline sync model** (`src/models/sync.ts`): the core domain logic. Scan events carry a `clientUuid` for **idempotency** (re-uploading the same batch is safe), and a server-side `ALLOWED_TRANSITIONS` map enforces valid linen-item status changes (`In Stock` → `Washing` → `On-Rent`), rejecting illegal transitions rather than trusting the device. `linen_items` rows carry a `version` column for optimistic concurrency. Note: `customer_id` / `job_order_id` are plain VARCHARs with **no FK constraints** yet — those modules don't exist in the DB; add constraints via `ALTER TABLE` when they do.
 
 **Code note**: `backend/` source contains Thai-language comments explaining business rules — preserve/match that style when editing those files.
+
+## Mobile Scanner App (`mobile/`)
+
+Native **Android** app (Gradle/Kotlin) for the **Chainway C72** UHF RFID handheld — the physical
+scanner for the single-scanner MVP. It logs in via `/v1/auth/login` (stores JWT + refresh, silent
+retry on 401) and uploads reads as `/v1/sync/batch` events — the **same contract** the web
+Check-in/Dispatch pages use. UI is mode-first for floor staff (Register / Pickup→Washing /
+Dispatch→On-Rent / Return→In Stock / Stock check) and bilingual (EN default + TH). It can also link
+into a web-opened **registration station** by code (`/v1/sync/session`). Vendor SDK ships as
+`mobile/app/libs/DeviceAPI.aar`. Full device contract: `docs/device/chainway-c72-integration.md`.
+Built debug APKs are checked in at repo root (`LaundryKingScanner-v*.apk`) and served at
+`/downloads/*`. **Status:** built and packaged; RFID read path **not yet verified on real C72
+hardware**.
 
 ## Frontend ↔ Backend Integration
 
@@ -458,7 +473,41 @@ agent-team-workflow memory). **Finance** — `/finance/expenses` + `/finance/inv
 never edits `current_stock` via PUT; badges/KPIs use the server `alertLevel`). **Reports** —
 `/reports` (`lib/api/reports.ts`; period `<Select>`, null %-change renders as em-dash, one
 recharts sales-by-service bar). All follow the plain `useEffect` fetch + inline `<Alert>` pattern
-(no SWR/toaster). Remaining mock pages: `checkin`, `ai-scanner`.
+(no SWR/toaster). Remaining mock pages: `operations/dispatch`, `ai-scanner`.
+
+### Done — Registration modes + station + Check-in
+The **Register Linen** page (`/add-item`, `lib/api/sync.ts` + `lib/api/session.ts`) now has five
+modes (`single | batch | scanner | manual | station`): single-tag, batch bulk-commission, a
+hands-free **scanner-gun** mode (keyboard-wedge gun types `tag`+Enter, one register per shot),
+**manual key-in** for non-RFID linen (enter a quantity; tags get `NR-` prefixed ids, capped at 500
+per submit), and **station** mode — the web picks the Article/owner context and shows a code, a C72
+links in over `/v1/sync/session`, and a big live counter reflects tags as they're shot. **Check-in**
+(`/checkin`, `lib/api/linen-items.ts` + `lib/api/sync.ts`) is wired: it lists items and posts
+status-change events (`buildStatusChangeEvents` → `/sync/batch`).
+
+### Done — UX/IA pass (navigation, empty states, feedback)
+A cross-cutting usability pass; keep these conventions when adding pages.
+
+- **`dark` lives on `<html>`** (`app/layout.tsx`). It used to sit on a div inside `<body>`, so
+  `body { bg-background text-foreground }` and every Radix/sonner **portal** (which mounts onto
+  `document.body`) resolved the *light* palette — outline buttons rendered black-on-black and
+  dialogs came out light. Do not move it back down the tree.
+- **Thai is the default locale** (`i18n/config.ts`), since the operators are Thai. `/` → `/th`.
+- **Operator home `/work`** (`app/[locale]/work/page.tsx`) — the mode-first "what are you doing?"
+  screen the single-scanner MVP calls for: six large targets, each with a plain-language line.
+  The dashboard stays the manager view.
+- **Sidebar groups by job, not by table** (`components/sidebar.tsx`): Overview / Daily Work /
+  Linen & SKUs / Supplies / Finance / Reports. Linen (RFID pieces + SKU master) and Supplies
+  (consumables) are deliberately separate — four adjacent linen-ish entries were unreadable.
+  Each item carries a `nav.desc.*` blurb used as its hover tooltip; page titles must match the
+  nav label.
+- **`<EmptyState>`** (`components/EmptyState.tsx`) replaces dead-end "No data" rows: icon +
+  what the list is for + the one action that unblocks the user. Drop it in a full-width
+  `<TableCell colSpan={n} className="p-0">`, and branch on *raw* list length vs filtered length
+  so "nothing yet" and "no search results" read differently. Copy lives in the `empty` namespace.
+- **Toasts**: `<Toaster theme="dark" position="top-center" richColors />` is mounted in the locale
+  layout. Mutations fire `toast.success(tc('saved') | tc('created'))`; inline `<Alert>` stays for
+  load/validation errors. Errors that block a save still belong inline, next to the field.
 
 ### Integration Pattern (reference)
 
@@ -524,8 +573,12 @@ operational quick-reference.
 - **TLS/DNS:** Cloudflare hosts `senses-iot.com`. The `laundryking` A record is **DNS-only
   (grey cloud)** so Caddy can complete the Let's Encrypt HTTP-01 challenge. If the orange-cloud
   proxy is ever enabled, set Cloudflare SSL mode to **Full (Strict)**.
-- **Backups:** `scripts/backup-db.sh` runs nightly via cron (02:30) → `/opt/linenflow/backups`.
-  **TODO: copy dumps off-box** (Spaces/S3) — an on-box-only backup doesn't survive droplet loss.
+- **Backups:** `scripts/backup-db.sh` runs nightly via cron (02:30) → `/opt/linenflow/backups`,
+  and optionally uploads off-box to DigitalOcean Spaces (S3-compatible) when `SPACES_BUCKET` /
+  `SPACES_ENDPOINT` / `SPACES_ACCESS_KEY` / `SPACES_SECRET_KEY` are set in `.env.prod` (needs the
+  `aws` CLI on the box; local copy is kept regardless).
+- **Static assets via Caddy:** the user guide is served at `/guide` and scanner APK downloads at
+  `/downloads/*` (see `Caddyfile`); the built APKs (`LaundryKingScanner-v*.apk`) live at repo root.
 - **Multi-tenancy = one droplet/stack per customer** at `<customer>.senses-iot.com`. Each is a
   single-tenant deployment with its own `DOMAIN` + DB. To onboard a new customer: new droplet,
   new subdomain, edit the branch seed (below), deploy.
@@ -539,11 +592,11 @@ the running `postgres` container, since the `schema.sql` seed is `ON CONFLICT DO
 update existing rows). Building a real branches endpoint would remove this dual-maintenance.
 
 ### Customer-handoff state (what's real vs pending)
-Every business-data page is backend-wired and the production DB starts empty (ready for real data).
-**Hidden until built:** AI Scanner (commented out in `components/sidebar.tsx`; no backend).
-**Still on mock data pending the scanner phase:** `checkin` and `operations/dispatch` (plus
-`components/DispatchLabel.tsx`, `lib/mockData.ts`) — these will be wired when the RFID handheld
-scanner work lands (device uploads to `/v1/sync/batch`, already implemented).
+Every business-data page (including Check-in) is backend-wired and the production DB starts empty
+(ready for real data). **Hidden from the sidebar** (`components/sidebar.tsx` — commented out):
+`checkin`, `ai-scanner`, and `operations/dispatch`. **Still on mock data:** `operations/dispatch`
+(plus `components/DispatchLabel.tsx`, `lib/mockData.ts`) and `ai-scanner` (no backend) — Dispatch
+will be wired via the same `/v1/sync/batch` status-change path Check-in already uses.
 
 ## Documentation Files
 
