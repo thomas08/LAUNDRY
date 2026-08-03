@@ -801,7 +801,15 @@
     "accountInfo": "Account Information",
     "name": "Name",
     "email": "Email",
-    "role": "Role"
+    "role": "Role",
+    "scannerApp": {
+      "title": "Scanner app (Android)",
+      "description": "Install file for the Chainway C72 handheld. Superadmin only.",
+      "version": "Version",
+      "download": "Download APK",
+      "installHint": "Open the file on the handheld to install. Android will ask you to allow installing from this source the first time.",
+      "allVersions": "Browse all builds"
+    }
   },
   "articles": {
     "title": "Linen Types",

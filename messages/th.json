@@ -801,7 +801,15 @@
     "accountInfo": "ข้อมูลบัญชี",
     "name": "ชื่อ",
     "email": "อีเมล",
-    "role": "บทบาท"
+    "role": "บทบาท",
+    "scannerApp": {
+      "title": "แอปสแกนเนอร์ (Android)",
+      "description": "ไฟล์ติดตั้งสำหรับเครื่องสแกน Chainway C72 — เห็นเฉพาะ superadmin",
+      "version": "เวอร์ชัน",
+      "download": "ดาวน์โหลด APK",
+      "installHint": "เปิดไฟล์บนเครื่องสแกนเพื่อติดตั้ง ครั้งแรก Android จะถามให้อนุญาตติดตั้งจากแหล่งนี้ก่อน",
+      "allVersions": "ดูไฟล์ทุกเวอร์ชัน"
+    }
   },
   "articles": {
     "title": "จัดการชนิดผ้า",

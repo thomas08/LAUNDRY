@@ -5,8 +5,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useTranslations } from 'next-intl'
-import { Loader2, KeyRound, CheckCircle } from 'lucide-react'
+import { Loader2, KeyRound, CheckCircle, Smartphone, Download } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { SCANNER_APP } from '@/lib/scanner-app'
 import { useRouter } from '@/lib/navigation'
 import { changePasswordRequest } from '@/lib/api/auth'
 import { ApiError } from '@/lib/api/client'
@@ -173,6 +174,44 @@ export default function AccountPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Scanner APK — superadmin only, for setting up a new C72 handheld.
+            NOTE: this hides the link, it does not protect the file: /downloads/
+            is served by Caddy without auth, so the URL is reachable by anyone
+            who knows it. */}
+        {user?.role === 'superadmin' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Smartphone className="h-5 w-5" />
+                {t('scannerApp.title')}
+              </CardTitle>
+              <CardDescription>{t('scannerApp.description')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between border-b border-border pb-2 text-sm">
+                <span className="text-muted-foreground">{t('scannerApp.version')}</span>
+                <span className="font-mono font-medium">v{SCANNER_APP.version}</span>
+              </div>
+
+              <Button asChild className="w-full">
+                <a href={SCANNER_APP.url} download>
+                  <Download className="mr-2 h-4 w-4" />
+                  {t('scannerApp.download')}
+                </a>
+              </Button>
+
+              <p className="text-xs text-muted-foreground">{t('scannerApp.installHint')}</p>
+
+              <a
+                href={SCANNER_APP.allVersionsUrl}
+                className="block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                {t('scannerApp.allVersions')}
+              </a>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )
