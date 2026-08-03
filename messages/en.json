@@ -169,7 +169,9 @@
     "additionalInfo": "Additional info",
     "currentBalance": "Current balance",
     "jobOrders": "Job Orders",
-    "jobOrdersComingSoon": "Job order history will appear here once the operations module is live."
+    "jobOrdersComingSoon": "Job order history will appear here once the operations module is live.",
+    "vatRate": "VAT rate",
+    "noVat": "No VAT"
   },
   "inventory": {
     "title": "Linen Items (RFID)",
@@ -990,5 +992,31 @@
     "expensesAction": "Record expense",
     "noResultsTitle": "Nothing matches your search",
     "noResultsDesc": "Try a different keyword or clear the filters."
+  },
+  "priceList": {
+    "title": "Price list",
+    "description": "Unit prices agreed with this customer. Prices are per customer — the same item can cost a different amount for another account.",
+    "sku": "SKU",
+    "skuPlaceholder": "e.g. 6 or 6sp",
+    "itemName": "Item",
+    "serviceType": "Service",
+    "unitPrice": "Unit price",
+    "addPrice": "Add price",
+    "editPrice": "Change price",
+    "searchPlaceholder": "Search SKU or item…",
+    "washCount": "{count} wash prices",
+    "rentalCount": "{count} rental prices",
+    "emptyTitle": "No prices set for this customer",
+    "emptyDescription": "Add the unit price for each item you wash or rent to this customer, so invoices can be calculated automatically.",
+    "noResults": "No matching price",
+    "noResultsHint": "Try a different SKU or item name.",
+    "invalidPrice": "Enter a price of 0 or more.",
+    "skuRequired": "Choose an SKU.",
+    "unknownSku": "SKU \"{sku}\" is not in the catalog.",
+    "loadError": "Failed to load the price list.",
+    "serviceTypes": {
+      "wash": "Wash",
+      "rental": "Rental"
+    }
   }
 }

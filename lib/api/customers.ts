@@ -16,16 +16,19 @@ export interface CustomerInput {
   taxId?: string | null
   creditLimit?: number | null
   paymentTerms?: number | null
+  /** VAT rate as a fraction (0.07 = 7%); 0 for customers billed without VAT. */
+  vatRate?: number | null
   branchId: string
 }
 
-// pg NUMERIC (credit_limit/current_balance) comes back as strings — coerce.
+// pg NUMERIC (credit_limit/current_balance/vat_rate) comes back as strings — coerce.
 function normalize(c: any): Customer {
   return {
     ...c,
     creditLimit: c.creditLimit != null ? Number(c.creditLimit) : undefined,
     currentBalance: c.currentBalance != null ? Number(c.currentBalance) : undefined,
     paymentTerms: c.paymentTerms != null ? Number(c.paymentTerms) : undefined,
+    vatRate: c.vatRate != null ? Number(c.vatRate) : undefined,
   }
 }
 

@@ -88,6 +88,8 @@ export interface Customer {
   creditLimit?: number
   currentBalance?: number
   paymentTerms?: number // days
+  /** VAT rate as a FRACTION (0.07 = 7%). Some accounts are billed without VAT (0). */
+  vatRate?: number
   isActive?: boolean
   createdAt?: string
   updatedAt?: string

@@ -15,6 +15,7 @@ export interface Customer {
   creditLimit: number | null;
   currentBalance: number | null;
   paymentTerms: number | null;
+  vatRate: number;
   branchId: string;
   isActive: boolean;
   createdAt: Date;
@@ -31,6 +32,7 @@ export interface CustomerInput {
   taxId?: string | null;
   creditLimit?: number | null;
   paymentTerms?: number | null;
+  vatRate?: number | null;   // อัตรา VAT เศษส่วน เช่น 0.07 (บางรายไม่คิด VAT = 0)
   branchId: string;
 }
 
@@ -38,7 +40,7 @@ const SELECT_COLS = `
   id, name, contact_person AS "contactPerson", email, phone, address,
   customer_type AS "customerType", tax_id AS "taxId",
   credit_limit AS "creditLimit", current_balance AS "currentBalance",
-  payment_terms AS "paymentTerms", branch_id AS "branchId",
+  payment_terms AS "paymentTerms", vat_rate AS "vatRate", branch_id AS "branchId",
   is_active AS "isActive", created_at AS "createdAt", updated_at AS "updatedAt"
 `;
 
@@ -77,8 +79,8 @@ export class CustomerModel {
     const rows = await query<Customer>(
       `INSERT INTO customers
         (id, name, contact_person, email, phone, address, customer_type,
-         tax_id, credit_limit, payment_terms, branch_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         tax_id, credit_limit, payment_terms, vat_rate, branch_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING ${SELECT_COLS}`,
       [
         id,
@@ -91,6 +93,7 @@ export class CustomerModel {
         input.taxId ?? null,
         input.creditLimit ?? null,
         input.paymentTerms ?? null,
+        input.vatRate ?? 0.07,
         input.branchId,
       ]
     );
@@ -108,6 +111,7 @@ export class CustomerModel {
       taxId: 'tax_id',
       creditLimit: 'credit_limit',
       paymentTerms: 'payment_terms',
+      vatRate: 'vat_rate',
       branchId: 'branch_id',
     };
     const sets: string[] = [];

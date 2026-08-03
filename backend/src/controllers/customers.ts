@@ -50,6 +50,11 @@ function validate(body: any, partial: boolean): string | null {
   if ('customerType' in body && body.customerType != null && !VALID_TYPES.includes(body.customerType)) {
     return `customerType must be one of: ${VALID_TYPES.join(', ')}`;
   }
+  // vatRate เก็บเป็นเศษส่วน (0.07 = 7%) ไม่ใช่เปอร์เซ็นต์
+  if ('vatRate' in body && body.vatRate != null) {
+    const n = Number(body.vatRate);
+    if (!Number.isFinite(n) || n < 0 || n > 1) return 'vatRate must be a fraction between 0 and 1 (e.g. 0.07)';
+  }
   return null;
 }
 

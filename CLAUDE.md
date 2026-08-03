@@ -402,7 +402,8 @@ Node.js + TypeScript + **Express 5** + **PostgreSQL** (`pg`), JWT auth with refr
 - `POST /v1/auth/login`, `POST /v1/auth/refresh`, `GET /v1/auth/me`
 - `POST /v1/auth/change-password` — change own password (auth required; revokes all refresh tokens on success)
 - `GET/POST /v1/articles`, `GET/PUT/DELETE /v1/articles/:id` — Linen Article (SKU master) CRUD (`ArticleModel`); DELETE is a soft-delete (`is_active=false`). RBAC: read/create/update/delete.
-- `GET/POST /v1/customers`, `GET/PUT/DELETE /v1/customers/:id` — Customer CRUD (`CustomerModel`, migration 004). Branch-scoped in the controller via `utils/branchScope.ts` (superadmin=all, admin=`branchIds`, user=primary). Soft-delete.
+- `GET/POST /v1/customers`, `GET/PUT/DELETE /v1/customers/:id` — Customer CRUD (`CustomerModel`, migration 004). Branch-scoped in the controller via `utils/branchScope.ts` (superadmin=all, admin=`branchIds`, user=primary). Soft-delete. `customers.vat_rate` (migration 012) is a **fraction** (0.07 = 7%); some real accounts are billed with no VAT (0).
+- `GET/POST /v1/customers/:id/price-list`, `PUT/DELETE /v1/customers/:id/price-list/:rowId` — **per-customer rate card** (`CustomerPriceListModel`, migration 012). Laundry pricing is negotiated per account: the same SKU is billed at different unit prices to different hotels (43 of 98 real SKUs vary), so there is no global price — prices live here, **not** on `linen_articles.unit_price`. Keyed by `(customer_id, sku, service_type)` where `service_type` is `wash` (ค่าซัก) or `rental` (ค่าเช่า). POST is an **upsert** that resolves the SKU against `v_sku_catalog` (case-insensitive, so `6SP` from an invoice matches catalog `6sp`) and rejects unknown SKUs with 400; DELETE is a soft-delete. Every row inherits branch access from its customer.
 - `GET /v1/linen-items?status=&ownership=` — read-only linen inventory list (`LinenItemModel`), branch-scoped, LEFT JOINs `linen_articles` (articleName) + `customers` (customerName). Items are written only via the sync pipeline.
 - `GET/POST /v1/job-orders`, `GET/PUT/DELETE /v1/job-orders/:id`, `PATCH /v1/job-orders/:id/status` — Job Order CRUD (`JobOrderModel`, migration 005). Branch-scoped; `order_number` from a sequence (`JO-YYYY-NNNN`); `total_price` computed server-side (`servicePrice*weight + additionalCharges − discount`); status change auto-sets completed_at/delivered_at; DELETE = cancel (status `cancelled`). FK `customer_id → customers(id)`.
 - `GET/POST /v1/expenses`, `PUT/DELETE /v1/expenses/:id` — Expense CRUD (`ExpenseModel`, migration 006). Branch-scoped; `total_amount = amount + vatAmount` server-side; `expense_number` `EXP-YYYY-NNNN`; DELETE is a **hard** delete.
@@ -456,6 +457,24 @@ does full CRUD via a dialog + `CustomerDataTable`; the detail page fetches by id
 a placeholder pending the operations backend). The **Inventory** page (`/inventory`,
 `lib/api/linen-items.ts`) is a real read-only list with status/ownership filters and canonical
 statuses (`In Stock`/`Washing`/`On-Rent`). Branch scoping is enforced server-side.
+
+### Done — Real customer data + per-customer price lists (migration 012)
+The production dataset is **seeded from the customer's own June-2569 invoices**
+(`ฐานข้อมูลลูกค้า/*.xlsx`, 42 workbooks — untracked, not in git): **38 real LaundryKing
+customers** and **522 price rows** (511 ค่าซัก + 11 ค่าเช่า across 98 SKUs). Verified by
+reproducing all 41 source invoices from the seeded prices — Σ qty × price + VAT matches
+every printed total exactly. All 98 invoice codes decompose into the existing SKU catalog
+(migration 009), so no catalog changes were needed.
+
+Two domain facts this encodes, both previously unmodeled:
+- **Prices are per customer, not global** — see the `/customers/:id/price-list` endpoint above.
+  Do not add a global price field; extend `customer_price_lists` instead.
+- **VAT is per customer** — `customers.vat_rate`, a fraction (4 of the 38 accounts are 0).
+
+UI: `components/CustomerPriceList.tsx` on the customer detail page (`lib/api/price-list.ts`)
+— searchable rate card, add/edit/soft-delete, SKU picker backed by `/sku-catalog` search.
+Contact details (email/phone/address/taxId) are **empty by design**: the invoice files carry
+only the customer name, so operators fill those in through the Customers page.
 
 ### Done — Job Orders
 Real, backend-wired: the **Job Orders** page (`/operations/job-orders`, `lib/api/job-orders.ts`)
@@ -592,8 +611,9 @@ the running `postgres` container, since the `schema.sql` seed is `ON CONFLICT DO
 update existing rows). Building a real branches endpoint would remove this dual-maintenance.
 
 ### Customer-handoff state (what's real vs pending)
-Every business-data page (including Check-in) is backend-wired and the production DB starts empty
-(ready for real data). **Hidden from the sidebar** (`components/sidebar.tsx` — commented out):
+Every business-data page (including Check-in) is backend-wired. The production DB is **no longer
+empty**: migration 012 seeds LaundryKing's 38 real customers and their price lists (see
+"Done — Real customer data" above), so a fresh deploy already has real master data. **Hidden from the sidebar** (`components/sidebar.tsx` — commented out):
 `checkin`, `ai-scanner`, and `operations/dispatch`. **Still on mock data:** `operations/dispatch`
 (plus `components/DispatchLabel.tsx`, `lib/mockData.ts`) and `ai-scanner` (no backend) — Dispatch
 will be wired via the same `/v1/sync/batch` status-change path Check-in already uses.

@@ -8,6 +8,7 @@ import type { Customer, JobOrder, JobOrderStatus, ServiceType } from '@/lib/type
 import { fetchCustomer } from '@/lib/api/customers'
 import { fetchJobOrders } from '@/lib/api/job-orders'
 import { ApiError } from '@/lib/api/client'
+import { CustomerPriceList } from '@/components/CustomerPriceList'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -170,6 +171,12 @@ export default function CustomerDetailPage() {
               {customer.paymentTerms != null && (
                 <Row label={t('paymentTerms')} value={`${customer.paymentTerms} ${tc('days')}`} />
               )}
+              {customer.vatRate != null && (
+                <Row
+                  label={t('vatRate')}
+                  value={customer.vatRate > 0 ? `${(customer.vatRate * 100).toFixed(0)}%` : t('noVat')}
+                />
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">{tc('status')}</span>
                 <Badge variant={customer.isActive ? 'default' : 'outline'}>
@@ -180,8 +187,10 @@ export default function CustomerDetailPage() {
           </Card>
         </div>
 
-        {/* Job orders — pending operations backend */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Per-customer rate card — prices are negotiated per account */}
+          <CustomerPriceList customerId={customerId} />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
