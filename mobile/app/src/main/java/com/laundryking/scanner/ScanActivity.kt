@@ -1,8 +1,10 @@
 package com.laundryking.scanner
 
+import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -97,9 +99,10 @@ class ScanActivity : AppCompatActivity() {
         b.addBtn.setOnClickListener {
             val t = b.tagInput.text.toString().trim().uppercase()
             if (t.isNotEmpty()) { addTag(t); b.tagInput.setText("") }
+            hideKeyboard()
         }
-        b.clearBtn.setOnClickListener { tags.clear(); render() }
-        b.saveBtn.setOnClickListener { save() }
+        b.clearBtn.setOnClickListener { tags.clear(); render(); hideKeyboard() }
+        b.saveBtn.setOnClickListener { hideKeyboard(); save() }
         b.qtyAddBtn.setOnClickListener { addManualQuantity() }
 
         render(); updatePending()
@@ -143,6 +146,7 @@ class ScanActivity : AppCompatActivity() {
     /** REGISTER: mint N unique non-RFID codes (NR-...) and queue them like scanned tags.
      *  Each becomes one linen_item via the same item_receive path — no scanning needed. */
     private fun addManualQuantity() {
+        hideKeyboard()
         val qty = b.qtyInput.text.toString().trim().toIntOrNull() ?: 0
         if (qty < 1 || qty > MAX_MANUAL) return
         val stamp = System.currentTimeMillis().toString(36).uppercase()
@@ -164,7 +168,18 @@ class ScanActivity : AppCompatActivity() {
         b.countBig.text = tags.size.toString()
     }
 
+    /** ปิดคีย์บอร์ดแล้วคืน focus ให้ root — กันไม่ให้มันเด้งกลับมาบังเลขนับ/ปุ่ม */
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(b.root.windowToken, 0)
+        b.qtyInput.clearFocus()
+        b.tagInput.clearFocus()
+        b.root.requestFocus()
+    }
+
     private fun toggleScan() {
+        // เริ่ม/หยุดสแกน = เลิกยุ่งกับการพิมพ์ ปิดคีย์บอร์ดทุกครั้ง
+        hideKeyboard()
         if (uhf.isScanning) {
             uhf.stop(); b.scanToggle.setText(R.string.scan_start)
         } else {
@@ -172,9 +187,17 @@ class ScanActivity : AppCompatActivity() {
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode in triggerKeys && event?.repeatCount == 0) { toggleScan(); return true }
-        return super.onKeyDown(keyCode, event)
+    /**
+     * ดักไกยิงที่ระดับ window ไม่ใช่ที่ Activity.onKeyDown —
+     * ถ้าช่องกรอกกำลังมี focus อยู่ View มันจะกินปุ่มไปก่อน ทำให้ยิงแล้วไม่เริ่มสแกน
+     * (กิน ACTION_UP ด้วย ไม่งั้น View จะได้ UP ลอย ๆ)
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode in triggerKeys) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) toggleScan()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun save() {

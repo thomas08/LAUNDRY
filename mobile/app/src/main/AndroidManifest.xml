@@ -25,9 +25,13 @@
             android:name=".HomeActivity"
             android:exported="false" />
 
+        <!-- หน้าสแกนขับด้วยไกยิง ไม่ใช่การพิมพ์ — คีย์บอร์ดต้องไม่เด้งเองตอนเข้าหน้า
+             (ไม่งั้นมันบังเลขนับใหญ่กับปุ่ม เริ่มสแกน/บันทึก) และเมื่อผู้ใช้กดช่องกรอกเอง
+             ให้ย่อจอแทนการเลื่อนทับ -->
         <activity
             android:name=".ScanActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
         <!-- Persists the per-app language chosen via AppCompatDelegate.setApplicationLocales -->
         <service

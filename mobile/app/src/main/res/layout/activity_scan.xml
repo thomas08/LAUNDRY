@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- focusable* บน root: ให้ตัว root รับ focus แรกแทน EditText ลูก
+     (ในโหมดลงทะเบียน ช่อง "จำนวนชิ้น" เป็น EditText ตัวแรกในหน้า มันจะแย่ง focus
+      อัตโนมัติแล้วดันคีย์บอร์ดขึ้นมาบังจอ) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
     android:orientation="vertical">
 
     <!-- Colored header: back + mode name -->
@@ -147,6 +152,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:hint="0"
+                android:imeOptions="actionDone"
                 android:inputType="number" />
 
             <Button
@@ -240,6 +246,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:hint="@string/hint_tag"
+                android:imeOptions="actionDone"
                 android:inputType="textCapCharacters" />
 
             <Button

@@ -431,9 +431,18 @@ Check-in/Dispatch pages use. UI is mode-first for floor staff (Register / Pickup
 Dispatch→On-Rent / Return→In Stock / Stock check) and bilingual (EN default + TH). It can also link
 into a web-opened **registration station** by code (`/v1/sync/session`). Vendor SDK ships as
 `mobile/app/libs/DeviceAPI.aar`. Full device contract: `docs/device/chainway-c72-integration.md`.
-Built debug APKs are checked in at repo root (`LaundryKingScanner-v*.apk`) and served at
-`/downloads/*`. **Status:** built and packaged; RFID read path **not yet verified on real C72
-hardware**.
+
+Built debug APKs land at repo root as `LaundryKingScanner-v*.apk` but are **git-ignored**
+(`.gitignore` has `*.apk`) — they are build artifacts, not source. To publish one, rsync it to
+`/opt/linenflow/public/downloads/` on the droplet; Caddy maps `./public` → `/srv` and serves it
+at `/downloads/*` (directory browsing on). Build with the full JDK 17 (see the `verify` skill).
+
+**Status:** built and packaged; RFID read path **not yet verified on real C72 hardware**.
+The scan screen is trigger-driven, so the soft keyboard must never auto-open there:
+`ScanActivity` sets `windowSoftInputMode="stateAlwaysHidden|adjustResize"`, the layout root takes
+first focus (`focusableInTouchMode`), and the hardware trigger is caught in `dispatchKeyEvent`
+rather than `onKeyDown` so a focused `EditText` cannot swallow it. Keep all four in place when
+touching that screen.
 
 ## Frontend ↔ Backend Integration
 
